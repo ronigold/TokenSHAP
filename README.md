@@ -16,17 +16,16 @@ pip install -r requirements.txt
 To use TokenSHAP, follow these simple steps:
 
 ```python
-from token_shap import TokenSHAP
 
-# Initialize TokenSHAP with your model
-model_path = "path_to_your_model"
-tokenizer_path = "path_to_your_tokenizer"
-tshap = TokenSHAP(model_path, tokenizer_path)
+# Initialize TokenSHAP with your model & tokenizer
+model_name = "llama3"
+tokenizer_path ="NousResearch/Hermes-2-Theta-Llama-3-8B"
+tshap = TokenSHAP(model_name, tokenizer_path)
 
 # Analyze token importance
-prompt = "Your prompt here"
-analysis = tshap.analyze(prompt)
-print(analysis)
+prompt = "is the sky red?"
+results = tshap.analyze(prompt)
+
 ```
 ![Tokens Importance](plot.jpeg)
 
@@ -46,4 +45,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## Support
 
-For support, email roni.goldshmidt@getnexar.com or open an issue on the GitHub project page.
+For support, email roni.goldshmidt@getnexar.com or miriam.horovicz@ni.com or open an issue on the GitHub project page.
