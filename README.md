@@ -28,7 +28,7 @@ prompt = "Your prompt here"
 analysis = tshap.analyze(prompt)
 print(analysis)
 ```
-![Tokens Importance](plot.png)
+![Tokens Importance](plot.jpeg)
 
 ## Contributing
 
