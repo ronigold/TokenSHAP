@@ -110,7 +110,7 @@ class TokenSHAP:
                     v_subset_with_i = v_subset_with_i[0]
 
                     shapley_values[sample] += (factorial(len(subset)) * factorial(n - len(subset) - 1) / factorial(n)) * (v_subset_with_i - v_subset)
-            return shapley_values
+        return shapley_values
     
     def _get_color(self, value, shapley_values):
             
