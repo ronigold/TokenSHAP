@@ -1,1 +1,1 @@
-ollama_api_url: << url >>
+ollama_api_url: http://192.168.11.9:11434/api

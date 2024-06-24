@@ -11,6 +11,7 @@ from math import factorial
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import re 
+import numpy as np
 
 class TokenSHAP:
     def __init__(self, model_name, tokenizer_path):
@@ -22,11 +23,10 @@ class TokenSHAP:
         self.ollama_api = config['ollama_api_url']
         
     def _calculate_baseline(self, prompt):
-        baseline_text, _ = interact_with_ollama(model=self.model_name, prompt=prompt, api_url=  self.ollama_api, output_handler=lambda o: o)
+        baseline_text, _ = interact_with_ollama(model=self.model_name, prompt=prompt, api_url=self.ollama_api, output_handler=lambda o: o)
         return baseline_text
     
-    def _get_result_per_token_combination(self, prompt, splitter):
-        # Check if a splitter is provided and split the prompt accordingly or tokenize if splitter is None
+    def _get_result_per_token_combination(self, prompt, splitter, sampling_ratio):
         if splitter is None:
             samples = self.tokenizer.tokenize(prompt)
             is_tokenized = True
@@ -34,32 +34,28 @@ class TokenSHAP:
             samples = prompt.split(splitter)
             is_tokenized = False
 
-        # Dictionary to store prompts and responses
+        num_total_combinations = 2**len(samples) - 1
+        num_sampled_combinations = max(1, int(num_total_combinations * sampling_ratio))
+        sampled_indices = set(np.random.choice(num_total_combinations, num_sampled_combinations, replace=False))
+
         prompt_responses = {}
+        for index in sampled_indices:
+            combination = [(index >> i) & 1 for i in range(len(samples))]
+            selected_samples = [samples[i] for i in range(len(samples)) if combination[i]]
 
-        # Generate all possible subgroups of tokens
-        for r in range(1, len(samples)):
-            for combination in combinations(range(len(samples)), r):
-                if is_tokenized:
-                    # Prepare text by omitting tokens not in the current combination for tokenized input
-                    omitted_tokens = [token for idx, token in enumerate(samples) if idx not in combination]
-                    omitted_text = self.tokenizer.convert_tokens_to_string(omitted_tokens)
-                else:
-                    #Prepare text by using only the samples in the current combination for split text
-                    selected_samples = [samples[idx] for idx in combination]
-                    omitted_text = splitter.join(selected_samples)
+            if is_tokenized:
+                text = self.tokenizer.convert_tokens_to_string(selected_samples)
+            else:
+                text = splitter.join(selected_samples)
 
-                # Call the interaction function with the model
-                text_response, response = interact_with_ollama(
-                    model=self.model_name,
-                    prompt=omitted_text,
-                    api_url=self.ollama_api,
-                    stream=True, 
-                    output_handler=lambda o: o
-                )
-
-                # Save the prompt and response in the dictionary
-                prompt_responses[omitted_text] = text_response
+            text_response, response = interact_with_ollama(
+                model=self.model_name,
+                prompt=text,
+                api_url=self.ollama_api,
+                stream=True, 
+                output_handler=lambda o: o
+            )
+            prompt_responses[text] = text_response
         return prompt_responses
     
     def _get_df_per_token_combination(self, prompt_responses, baseline_text):
@@ -113,34 +109,42 @@ class TokenSHAP:
         return shapley_values
     
     def _get_color(self, value, shapley_values):
-            
-            # Normalize the value between 0 and 1
-            norm_value = (value - min(shapley_values.values())) / (max(shapley_values.values()) - min(shapley_values.values()))
-            # Create a color map that transitions from red (low) to blue (high)
-            cmap = plt.cm.coolwarm
-            return colors.rgb2hex(cmap(norm_value))
         
+        # Normalize the value between 0 and 1
+        norm_value = (value - min(shapley_values.values())) / (max(shapley_values.values()) - min(shapley_values.values()))
+        cmap = plt.cm.coolwarm
+        return colors.rgb2hex(cmap(norm_value))
+    
     def _plot_colored_text(self, shapley_values):
-            # Determine the number of items and set the figure height accordingly
-            num_items = len(shapley_values)
-            fig_height = num_items * 0.5  # Adjust height factor based on preference and text size
+        # Determine the number of items and set the figure height accordingly
+        num_items = len(shapley_values)
+        fig_height = num_items * 0.5 + 1  # Added extra space for legend
 
-            plt.figure(figsize=(10, fig_height))
-            plt.axis('off')
+        fig, ax = plt.subplots(figsize=(10, fig_height))
+        ax.axis('off')
 
-            y_pos = 1  # Start from the top of the plot
-            step = 1 / num_items  # Step to move each word to a new line
+        y_pos = 1  # Start from the top of the plot
+        step = 1 / (num_items + 1)  # Adjusted step to leave space for legend
 
-            for sample, value in shapley_values.items():
-                plt.text(0.5, y_pos, sample, color=self._get_color(value, shapley_values), fontsize=20, ha='center', va='center', transform=plt.gca().transAxes)
-                y_pos -= step  # Move down for each new word
+        for sample, value in shapley_values.items():
+            color = self._get_color(value, shapley_values)
+            ax.text(0.5, y_pos, sample, color=color, fontsize=20, ha='center', va='center', transform=ax.transAxes)
+            y_pos -= step  # Move down for each new word
 
-            plt.show()
+        # Add a color bar as legend
+        sm = plt.cm.ScalarMappable(cmap=plt.cm.coolwarm, norm=plt.Normalize(vmin=min(shapley_values.values()), vmax=max(shapley_values.values())))
+        sm.set_array([])
+        cbar = plt.colorbar(sm, ax=ax, orientation='horizontal', pad=0.05)
+        cbar.set_label('Shapley Value', fontsize=12)
+
+        plt.tight_layout()
+        plt.show()
+
             
-    def analyze(self, prompt, splitter = None):
+    def analyze(self, prompt, splitter = None, sampling_ratio = 0.3):
         
         baseline_text = self. _calculate_baseline(prompt)
-        token_combinations_results = self._get_result_per_token_combination(prompt, splitter)
+        token_combinations_results = self._get_result_per_token_combination(prompt, splitter, sampling_ratio)
         df_per_token_combination = self._get_df_per_token_combination(token_combinations_results, baseline_text)
         self.shapley_values = self._calculate_shapley_values(df_per_token_combination, prompt, splitter)
         self._plot_colored_text(self.shapley_values)
