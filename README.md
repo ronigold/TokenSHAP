@@ -3,6 +3,8 @@
 
 TokenSHAP offers a novel method for interpreting large language models (LLMs) using Monte Carlo Shapley value estimation. This Python library attributes importance to individual tokens within input prompts, enhancing our understanding of model decisions. By leveraging concepts from cooperative game theory adapted to the dynamic nature of natural language, TokenSHAP facilitates a deeper insight into how different parts of an input contribute to the model's response.
 
+![Tokens Importance](plot.jpeg)
+
 ## About TokenSHAP
 
 The method introduces an efficient way to estimate the importance of tokens based on Shapley values, providing interpretable, quantitative measures of token importance. It addresses the combinatorial complexity of language inputs and demonstrates efficacy across various prompts and LLM architectures. TokenSHAP represents a significant advancement in making AI more transparent and trustworthy, particularly in critical applications such as healthcare diagnostics, legal analysis, and automated decision-making systems.
