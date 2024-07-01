@@ -93,8 +93,7 @@ class TokenSHAP:
         return df
     
     def _calculate_shapley_values(self, df_per_token_combination, prompt, splitter):
-        
-        def normalize_shapley_values(shapley_values, power=2):
+        def normalize_shapley_values(shapley_values, power=1):
             # Step 1: Shift values to make them all non-negative
             min_value = min(shapley_values.values())
             shifted_values = {k: v - min_value for k, v in shapley_values.items()}
@@ -104,10 +103,12 @@ class TokenSHAP:
             
             # Step 3: Normalize to sum to 1
             total = sum(powered_values.values())
+            if total == 0:
+                return {k: 1/len(powered_values) for k in powered_values}
             normalized_values = {k: v / total for k, v in powered_values.items()}
             
             return normalized_values
-
+    
         if splitter is None:            
             tokens = self.tokenizer.tokenize(prompt)
             samples = [token.strip('Ġ') if token.startswith('Ġ') else token for token in tokens]
@@ -116,7 +117,7 @@ class TokenSHAP:
             
         n = len(samples)
         shapley_values = {sample: 0 for sample in samples}
-
+    
         # Iterate over each sample in the original sentence
         for i, sample in enumerate(samples):
             for j in range(1, n+1):
@@ -126,24 +127,25 @@ class TokenSHAP:
                     # Convert indices back to samples
                     subset_samples = [samples[k] for k in subset]
                     subset_with_i_samples = [samples[k] for k in subset_with_i]
-
+    
                     # Find the corresponding rows in the DataFrame
-                    subset_str = " ".join(subset_samples)
-                    subset_with_i_str = " ".join(subset_with_i_samples)
-
+                    subset_str = splitter.join(subset_samples) if splitter else " ".join(subset_samples)
+                    subset_with_i_str = splitter.join(subset_with_i_samples) if splitter else " ".join(subset_with_i_samples)
+    
                     v_subset = df_per_token_combination[df_per_token_combination["Prompt"].str.contains(subset_str, regex=False)]["Cosine_Similarity"].values
                     v_subset_with_i = df_per_token_combination[df_per_token_combination["Prompt"].str.contains(subset_with_i_str, regex=False)]["Cosine_Similarity"].values
-
+    
                     # Ensure that there are matching rows
                     if len(v_subset) == 0:
                         v_subset = [0]
                     if len(v_subset_with_i) == 0:
                         v_subset_with_i = [0]
-
+    
                     v_subset = v_subset[0]
                     v_subset_with_i = v_subset_with_i[0]
-
+    
                     shapley_values[sample] += (factorial(len(subset)) * factorial(n - len(subset) - 1) / factorial(n)) * (v_subset_with_i - v_subset)
+    
         return normalize_shapley_values(shapley_values)
     
     def print_colored_text(self):
