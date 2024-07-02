@@ -118,33 +118,15 @@ class TokenSHAP:
         n = len(samples)
         shapley_values = {sample: 0 for sample in samples}
     
-        # Iterate over each sample in the original sentence
-        for i, sample in enumerate(samples):
-            for j in range(1, n+1):
-                for subset in itertools.combinations([k for k in range(n) if k != i], j-1):
-                    subset = list(subset)
-                    subset_with_i = subset + [i]
-                    # Convert indices back to samples
-                    subset_samples = [samples[k] for k in subset]
-                    subset_with_i_samples = [samples[k] for k in subset_with_i]
-    
-                    # Find the corresponding rows in the DataFrame
-                    subset_str = splitter.join(subset_samples) if splitter else " ".join(subset_samples)
-                    subset_with_i_str = splitter.join(subset_with_i_samples) if splitter else " ".join(subset_with_i_samples)
-    
-                    v_subset = df_per_token_combination[df_per_token_combination["Prompt"].str.contains(subset_str, regex=False)]["Cosine_Similarity"].values
-                    v_subset_with_i = df_per_token_combination[df_per_token_combination["Prompt"].str.contains(subset_with_i_str, regex=False)]["Cosine_Similarity"].values
-    
-                    # Ensure that there are matching rows
-                    if len(v_subset) == 0:
-                        v_subset = [0]
-                    if len(v_subset_with_i) == 0:
-                        v_subset_with_i = [0]
-    
-                    v_subset = v_subset[0]
-                    v_subset_with_i = v_subset_with_i[0]
-    
-                    shapley_values[sample] += (factorial(len(subset)) * factorial(n - len(subset) - 1) / factorial(n)) * (v_subset_with_i - v_subset)
+        for sample in samples:
+            try:
+                with_sample = np.average(df_per_token_combination[df_per_token_combination["Prompt"].str.contains(sample)]["Cosine_Similarity"].values)
+                without_sample = np.average(df_per_token_combination[~df_per_token_combination["Prompt"].str.contains(sample)]["Cosine_Similarity"].values)
+            except:
+                with_sample = np.average(df_per_token_combination[df_per_token_combination["Prompt"].str.contains("\\" + sample, regex=True)]["Cosine_Similarity"].values)
+                without_sample = np.average(df_per_token_combination[~df_per_token_combination["Prompt"].str.contains("\\" + sample, regex=True)]["Cosine_Similarity"].values)
+
+            shapley_values[sample] = with_sample - without_sample
     
         return normalize_shapley_values(shapley_values)
     
@@ -207,9 +189,9 @@ class TokenSHAP:
         plt.show()
 
     def analyze(self, prompt, splitter=None, sampling_ratio=0.3, print_result = False):
-        baseline_text = self._calculate_baseline(prompt)
+        self.baseline_text = self._calculate_baseline(prompt)
         token_combinations_results = self._get_result_per_token_combination(prompt, splitter, sampling_ratio)
-        df_per_token_combination = self._get_df_per_token_combination(token_combinations_results, baseline_text)
+        df_per_token_combination = self._get_df_per_token_combination(token_combinations_results, self.baseline_text)
         self.shapley_values = self._calculate_shapley_values(df_per_token_combination, prompt, splitter)
         if print_result:
             self.print_colored_text()
