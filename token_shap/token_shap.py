@@ -1,6 +1,6 @@
 from itertools import combinations
 from transformers import AutoTokenizer
-from ollama_interact import interact_with_ollama
+from .ollama_interact import interact_with_ollama
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -15,6 +15,7 @@ import numpy as np
 import random
 import numpy as np
 import colorsys
+import os
 
 class TokenSHAP:
     def __init__(self, model_name, tokenizer_path = None):
@@ -22,7 +23,10 @@ class TokenSHAP:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         self.model_name = model_name
         
-        with open('config.yaml', 'r') as file:
+        dir_path = os.path.dirname(os.path.abspath(__file__))
+        config_path = os.path.join(dir_path, 'config.yaml')
+
+        with open(config_path, 'r') as file:
             config = yaml.safe_load(file)
         self.ollama_api = config['ollama_api_url']
         
