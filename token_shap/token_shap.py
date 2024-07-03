@@ -1,6 +1,6 @@
 from itertools import combinations
 from transformers import AutoTokenizer
-from .ollama_interact import interact_with_ollama
+from ollama_interact import interact_with_ollama
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -42,6 +42,9 @@ class TokenSHAP:
             samples = prompt.split(splitter)
             is_tokenized = False
     
+        if len(samples) > 100:
+            print("warning: the samples size is greather than 100, execution will be slow")
+        
         num_total_combinations = 2**len(samples) - 1
         num_sampled_combinations = max(1, int(num_total_combinations * sampling_ratio))
     
@@ -49,15 +52,16 @@ class TokenSHAP:
         essential_combinations = []
         for i in range(len(samples)):
             combination = samples[:i] + samples[i+1:]
-            essential_combinations.append(combination)
+            essential_combinations.append((combination, [j+1 for j in range(len(samples)) if j != i]))
     
         # Generate all possible combinations
-        all_combinations = [samples]
+        all_combinations = [(samples, list(range(1, len(samples)+1)))]
         for r in range(1, len(samples)):
-            all_combinations.extend(combinations(samples, r))
+            all_combinations.extend([(list(comb), [i+1 for i, token in enumerate(samples) if token in comb]) 
+                                     for comb in combinations(samples, r)])
     
         # Remove essential combinations from all combinations
-        remaining_combinations = [comb for comb in all_combinations if list(comb) not in essential_combinations]
+        remaining_combinations = [comb for comb in all_combinations if comb not in essential_combinations]
     
         # Sample additional combinations
         num_additional_samples = max(0, num_sampled_combinations - len(essential_combinations))
@@ -68,7 +72,7 @@ class TokenSHAP:
         all_combinations_to_process = essential_combinations + sampled_combinations
     
         prompt_responses = {}
-        for combination in all_combinations_to_process:
+        for combination, indexes in all_combinations_to_process:
             if is_tokenized:
                 text = self.tokenizer.convert_tokens_to_string(combination)
             else:
@@ -81,12 +85,14 @@ class TokenSHAP:
                 stream=True, 
                 output_handler=lambda o: o
             )
-            prompt_responses[text] = text_response
+            prompt_responses[text + '_' + ','.join(str(index) for index in indexes)] = (text_response, indexes)
         
         return prompt_responses
     
     def _get_df_per_token_combination(self, prompt_responses, baseline_text):
-        df = pd.DataFrame(list(prompt_responses.items()), columns=['Prompt', 'Response'])
+        df = pd.DataFrame([(prompt.split('_')[0], response[0], response[1]) 
+                           for prompt, response in prompt_responses.items()],
+                          columns=['Prompt', 'Response', 'Token_Indexes'])
    
         all_texts = [baseline_text] + df["Response"].tolist()
         vectorizer = TfidfVectorizer().fit_transform(all_texts)
@@ -120,17 +126,13 @@ class TokenSHAP:
             samples = prompt.split(splitter)
             
         n = len(samples)
-        shapley_values = {sample: 0 for sample in samples}
+        shapley_values = {}
     
-        for sample in samples:
-            try:
-                with_sample = np.average(df_per_token_combination[df_per_token_combination["Prompt"].str.contains(sample)]["Cosine_Similarity"].values)
-                without_sample = np.average(df_per_token_combination[~df_per_token_combination["Prompt"].str.contains(sample)]["Cosine_Similarity"].values)
-            except:
-                with_sample = np.average(df_per_token_combination[df_per_token_combination["Prompt"].str.contains("\\" + sample, regex=True)]["Cosine_Similarity"].values)
-                without_sample = np.average(df_per_token_combination[~df_per_token_combination["Prompt"].str.contains("\\" + sample, regex=True)]["Cosine_Similarity"].values)
+        for i, sample in enumerate(samples, start=1):  # Start enumeration from 1 to match token indexes
+            with_sample = np.average(df_per_token_combination[df_per_token_combination["Token_Indexes"].apply(lambda x: i in x)]["Cosine_Similarity"].values)
+            without_sample = np.average(df_per_token_combination[df_per_token_combination["Token_Indexes"].apply(lambda x: i not in x)]["Cosine_Similarity"].values)
 
-            shapley_values[sample] = with_sample - without_sample
+            shapley_values[sample + "_" + str(i)] = with_sample - without_sample
     
         return normalize_shapley_values(shapley_values)
     
@@ -158,7 +160,7 @@ class TokenSHAP:
         
         for token, value in shapley_values.items():
             color = get_color(value)
-            print(f'\033[38;2;{int(color[1:3], 16)};{int(color[3:5], 16)};{int(color[5:7], 16)}m{token}\033[0m', end=' ')
+            print(f"\033[38;2;{int(color[1:3], 16)};{int(color[3:5], 16)};{int(color[5:7], 16)}m{token.split('_')[0]}\033[0m", end=' ')
         print()
 
     def _get_color(self, value, shapley_values):
@@ -180,7 +182,7 @@ class TokenSHAP:
 
         for sample, value in self.shapley_values.items():
             color = self._get_color(value, self.shapley_values)
-            ax.text(0.5, y_pos, sample, color=color, fontsize=20, ha='center', va='center', transform=ax.transAxes)
+            ax.text(0.5, y_pos, sample.split('_')[0], color=color, fontsize=20, ha='center', va='center', transform=ax.transAxes)
             y_pos -= step  # Move down for each new word
 
         # Add a color bar as legend
