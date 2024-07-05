@@ -4,6 +4,7 @@ from matplotlib import colors
 import numpy as np
 import yaml
 from ollama_interact import *
+import re
 
 class PromptEngineer:
     def __init__(self, model_name):
@@ -12,23 +13,43 @@ class PromptEngineer:
             config = yaml.safe_load(file)
         self.api_url = config['ollama_api_url']
         
+   
+    def clean_json_string(self, json_string):
+        # Remove keys without values using a regex
+        clean_string = re.sub(r'\"[^\"]+\"\s*(?=,|$)', '', json_string)
+        # Remove any trailing commas
+        clean_string = re.sub(r',\s*}', '}', clean_string)
+        clean_string = re.sub(r',\s*]', ']', clean_string)
+        return clean_string
+
     def get_importance(self, prompt):
-       
-       result , _ = interact_with_ollama(model=self.model_name, prompt="""I want you to give me back JSON with the importance number for each token based on the importance of each one for the answer. Return only the JSON."
+        result, _ = interact_with_ollama(
+            model=self.model_name,
+            prompt=f"""I want you to give me back JSON with the importance number for each token based on the importance of each one for the answer. Return only the JSON.
 
             Example 1:
             Question: "Is it raining today?"
-            JSON Response: {"Is": 0.3, "it": 0.6, "raining": 0.9, "today": 0.2, "?": 0.1}
+            JSON Response: {{"Is": 0.3, "it": 0.6, "raining": 0.9, "today": 0.2, "?": 0.1}}
 
             Example 2:
             Question: "Can dogs fly?"
-            JSON Response: {"Is": 0.2, "it": 0.7, "sunny": 0.1, "today": 0.3, "?": 0.8}
+            JSON Response: {{"Can": 0.2, "dogs": 0.7, "fly": 0.1, "?": 0.8}}
 
             Your Question:
-            "Is the sky red?"
-            Return the JSON.""", api_url=self.api_url, output_handler=lambda o: o)
-    
-       return json.loads(result)
+            "{prompt}"
+            Return the JSON.""",
+            api_url=self.api_url,
+            output_handler=lambda o: o
+        )
+
+
+        clean_result = self.clean_json_string(result)
+        importance_values = json.loads(clean_result)
+        total = sum(importance_values.values())
+        normalized_values = {token: value / total for token, value in importance_values.items()}
+
+        return normalized_values
+
 
     def _get_color(self, value, importance_values):
         # Normalize the value between 0 and 1
@@ -64,3 +85,5 @@ class PromptEngineer:
     def analyze_and_plot(self, prompt):
         importance_values = self.get_importance(prompt)
         self.plot_colored_text(importance_values)
+        
+        return importance_values
