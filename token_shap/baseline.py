@@ -14,8 +14,11 @@ class NaiveBaseline:
         self.corpus = []
 
     def random_importance(self, prompt):
-        tokens = self.tokenizer.tokenize(prompt)
-        return {token: random.random() for token in tokens}
+        tokens = prompt.split(' ')
+        random_values = {token: random.uniform(0, 1) for token in tokens}
+        total = sum(random_values.values())
+        normalized_values = {token: value / total for token, value in random_values.items()}
+        return normalized_values
 
     def position_based_importance(self, prompt):
         tokens = self.tokenizer.tokenize(prompt)
