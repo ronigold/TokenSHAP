@@ -46,7 +46,7 @@ class TokenSHAP:
             print("warning: the samples size is greather than 100, execution will be slow")
         
         num_total_combinations = 2**len(samples) - 1
-        num_sampled_combinations = max(1, int(num_total_combinations * sampling_ratio))
+        num_sampled_combinations = int(num_total_combinations * sampling_ratio)
     
         # Always include combinations where only one token is omitted
         essential_combinations = []
@@ -64,7 +64,7 @@ class TokenSHAP:
         remaining_combinations = [comb for comb in all_combinations if comb not in essential_combinations]
     
         # Sample additional combinations
-        num_additional_samples = max(0, num_sampled_combinations - len(essential_combinations))
+        num_additional_samples = max(1, num_sampled_combinations - len(essential_combinations))
         sampled_combinations = random.sample(remaining_combinations, 
                                              min(num_additional_samples, len(remaining_combinations)))
     
