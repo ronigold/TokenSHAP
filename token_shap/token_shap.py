@@ -169,26 +169,31 @@ class TokenSHAP:
         cmap = plt.cm.coolwarm
         return colors.rgb2hex(cmap(norm_value))
     
-    def plot_colored_text(self):
-        # Determine the number of items and set the figure height accordingly
+    def plot_colored_text(self, new_line=False):
         num_items = len(self.shapley_values)
-        fig_height = num_items * 0.5 + 1  # Added extra space for legend
+        fig_height = num_items * 0.5 + 1 if new_line else 2  # Adjust height based on new_line flag
 
         fig, ax = plt.subplots(figsize=(10, fig_height))
         ax.axis('off')
 
         y_pos = 1  # Start from the top of the plot
+        x_pos = 0.1  # Start from the left of the plot if not new_line
         step = 1 / (num_items + 1)  # Adjusted step to leave space for legend
 
         for sample, value in self.shapley_values.items():
             color = self._get_color(value, self.shapley_values)
-            ax.text(0.5, y_pos, sample.split('_')[0], color=color, fontsize=20, ha='center', va='center', transform=ax.transAxes)
-            y_pos -= step  # Move down for each new word
+            if new_line:
+                ax.text(0.5, y_pos, sample.split('_')[0], color=color, fontsize=20, ha='center', va='center', transform=ax.transAxes)
+                y_pos -= step  # Move down for each new word
+            else:
+                ax.text(x_pos, y_pos, sample.split('_')[0], color=color, fontsize=20, ha='left', va='center', transform=ax.transAxes)
+                x_pos += 0.1  # Move right for each new word (adjust as needed for spacing)
 
-        # Add a color bar as legend
+        # Add a color bar as legend at the bottom
         sm = plt.cm.ScalarMappable(cmap=plt.cm.coolwarm, norm=plt.Normalize(vmin=min(self.shapley_values.values()), vmax=max(self.shapley_values.values())))
         sm.set_array([])
         cbar = plt.colorbar(sm, ax=ax, orientation='horizontal', pad=0.05)
+        cbar.ax.set_position([0.05, 0.02, 0.9, 0.05])  # [left, bottom, width, height]
         cbar.set_label('Shapley Value', fontsize=12)
 
         plt.tight_layout()
