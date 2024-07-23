@@ -18,17 +18,11 @@ import colorsys
 import os
 
 class TokenSHAP:
-    def __init__(self, model_name, tokenizer_path = None):
+    def __init__(self, model_name, ollama_api_url, tokenizer_path=None):
         if tokenizer_path:
             self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
         self.model_name = model_name
-        
-        dir_path = os.path.dirname(os.path.abspath(__file__))
-        config_path = os.path.join(dir_path, 'config.yaml')
-
-        with open(config_path, 'r') as file:
-            config = yaml.safe_load(file)
-        self.ollama_api = config['ollama_api_url']
+        self.ollama_api = ollama_api_url 
         
     def _calculate_baseline(self, prompt):
         baseline_text, _ = interact_with_ollama(model=self.model_name, prompt=prompt, api_url=self.ollama_api, output_handler=lambda o: o)
