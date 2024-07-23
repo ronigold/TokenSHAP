@@ -51,7 +51,7 @@ results = tshap.analyze(prompt)
 
 Results will include SHAP values for each token, indicating their contribution to the model's output.
 
-For a more detailed example, please refer to our [example notebook](notebooks/TokenShap Examples.ipynb) in the repository.
+For a more detailed example and usage guide, please refer to our [TokenSHAP Examples notebook](notebooks/TokenSHAP%20Examples.ipynb) in the repository.
 
 ## Key Features
 
