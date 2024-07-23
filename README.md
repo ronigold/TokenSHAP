@@ -1,4 +1,3 @@
-
 # TokenSHAP
 
 TokenSHAP offers a novel method for interpreting large language models (LLMs) using Monte Carlo Shapley value estimation. This Python library attributes importance to individual tokens within input prompts, enhancing our understanding of model decisions. By leveraging concepts from cooperative game theory adapted to the dynamic nature of natural language, TokenSHAP facilitates a deeper insight into how different parts of an input contribute to the model's response.
@@ -9,9 +8,21 @@ TokenSHAP offers a novel method for interpreting large language models (LLMs) us
 
 The method introduces an efficient way to estimate the importance of tokens based on Shapley values, providing interpretable, quantitative measures of token importance. It addresses the combinatorial complexity of language inputs and demonstrates efficacy across various prompts and LLM architectures. TokenSHAP represents a significant advancement in making AI more transparent and trustworthy, particularly in critical applications such as healthcare diagnostics, legal analysis, and automated decision-making systems.
 
+## Prerequisites
+
+Before installing TokenSHAP, you need to have Ollama deployed and running. Ollama is required for TokenSHAP to interact with large language models.
+
+To install and set up Ollama, please follow the instructions in the [Ollama GitHub repository](https://github.com/ollama/ollama).
+
 ## Installation
 
-To install TokenSHAP, clone the repository and install the required dependencies:
+You can install TokenSHAP directly from PyPI using pip:
+
+```bash
+pip install tokenshap
+```
+
+Alternatively, to install from source:
 
 ```bash
 git clone https://github.com/ronigold/TokenSHAP.git
@@ -21,7 +32,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-TokenSHAP is easy to use with any model that supports SHAP value computation for NLP. Here’s a quick guide:
+TokenSHAP is easy to use with any model that supports SHAP value computation for NLP. Here's a quick guide:
 
 ```python
 # Import TokenSHAP
@@ -30,7 +41,8 @@ from token_shap import TokenSHAP
 # Initialize with your model & tokenizer
 model_name = "llama3"
 tokenizer_path = "NousResearch/Hermes-2-Theta-Llama-3-8B"
-tshap = TokenSHAP(model_name, tokenizer_path)
+ollama_api_url = "http://localhost:11434"  # Default Ollama API URL
+tshap = TokenSHAP(model_name, tokenizer_path, ollama_api_url)
 
 # Analyze token importance
 prompt = "Why is the sky blue?"
@@ -38,6 +50,8 @@ results = tshap.analyze(prompt)
 ```
 
 Results will include SHAP values for each token, indicating their contribution to the model's output.
+
+For a more detailed example, please refer to our [example notebook](notebooks/TokenShap Examples.ipynb) in the repository.
 
 ## Key Features
 
@@ -47,7 +61,7 @@ Results will include SHAP values for each token, indicating their contribution t
 
 ## Contributing
 
-We welcome contributions from the community, whether it's adding new features, improving documentation, or reporting bugs. Here’s how you can contribute:
+We welcome contributions from the community, whether it's adding new features, improving documentation, or reporting bugs. Here's how you can contribute:
 
 1. Fork the project
 2. Create your feature branch (`git checkout -b feature/YourAmazingFeature`)
@@ -63,7 +77,22 @@ For support, please email roni.goldshmidt@getnexar.com or miriam.horovicz@ni.com
 
 TokenSHAP is distributed under the MIT License. See `LICENSE` file for more information.
 
+## Citation
+
+If you use TokenSHAP in your research, please cite our paper:
+
+```
+@article{goldshmidt2024tokenshap,
+  title={TokenSHAP: Interpreting Large Language Models with Monte Carlo Shapley Value Estimation},
+  author={Goldshmidt, Roni and Horovicz, Miriam},
+  journal={arXiv preprint arXiv:2407.10114},
+  year={2024}
+}
+```
+
+You can find the full paper on arXiv: [https://arxiv.org/abs/2407.10114](https://arxiv.org/abs/2407.10114)
+
 ## Authors
 
-- **Miriam Horovicz**
 - **Roni Goldshmidt**
+- **Miriam Horovicz**
