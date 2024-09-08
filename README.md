@@ -1,4 +1,8 @@
-# TokenSHAP
+# TokenSHAP: Implementing the Paper with Monte Carlo Shapley Value Estimation
+
+TokenSHAP is a Python library designed to implement the method described in the paper "TokenSHAP: Interpreting Large Language Models with Monte Carlo Shapley Value Estimation" (Goldshmidt & Horovicz, 2024). This package introduces a novel approach for interpreting large language models (LLMs) by estimating Shapley values for individual tokens, providing insights into how specific parts of the input contribute to the model’s decisions.
+
+![Tokens Architecture](data/architecture.JPG)
 
 TokenSHAP offers a novel method for interpreting large language models (LLMs) using Monte Carlo Shapley value estimation. This Python library attributes importance to individual tokens within input prompts, enhancing our understanding of model decisions. By leveraging concepts from cooperative game theory adapted to the dynamic nature of natural language, TokenSHAP facilitates a deeper insight into how different parts of an input contribute to the model's response.
 
