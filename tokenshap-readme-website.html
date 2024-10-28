@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TokenSHAP - Token Importance for Text Classification</title>
+    <style>
+        :root {
+            --primary-color: #0366d6;
+            --background-color: #ffffff;
+            --code-bg: #f6f8fa;
+            --text-color: #24292e;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            color: var(--text-color);
+            background-color: var(--background-color);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 0 20px;
+        }
+
+        header {
+            background: linear-gradient(145deg, #0366d6, #044289);
+            color: white;
+            padding: 60px 0;
+            text-align: center;
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 2.5rem;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            margin: 20px 0;
+            opacity: 0.9;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background-color: white;
+            color: var(--primary-color);
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            margin: 10px;
+        }
+
+        section {
+            padding: 40px 0;
+        }
+
+        .method-section {
+            background-color: #f6f8fa;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .code-block {
+            background-color: var(--code-bg);
+            padding: 20px;
+            border-radius: 6px;
+            overflow-x: auto;
+            margin: 15px 0;
+            font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+            font-size: 14px;
+        }
+
+        .image-container {
+            max-width: 100%;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .image-container img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .steps {
+            background-color: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 20px 0;
+        }
+
+        .steps h3 {
+            color: var(--primary-color);
+            margin-top: 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 40px 0;
+            background-color: #f6f8fa;
+            margin-top: 40px;
+        }
+
+        .highlight {
+            background-color: #fff8c5;
+            padding: 2px 4px;
+            border-radius: 3px;
+        }
+
+        @media (max-width: 768px) {
+            header h1 {
+                font-size: 2rem;
+            }
+            
+            .container {
+                padding: 0 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>TokenSHAP</h1>
+            <p>A Novel Approach to Token Importance in Text Classification</p>
+            <div>
+                <a href="https://github.com/ronigold/TokenSHAP" class="button">View on GitHub</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section id="overview">
+            <h2>Overview</h2>
+            <p>
+                TokenSHAP is a novel method for integrating token importance into text classification explanations. 
+                It enhances traditional SHAP values by considering the contextual significance of individual tokens,
+                providing more accurate and interpretable results for text classification tasks.
+            </p>
+        </section>
+
+        <section id="methodology">
+            <h2>Methodology</h2>
+            <div class="method-section">
+                <h3>Token Importance Calculation</h3>
+                <p>
+                    Our approach combines:
+                </p>
+                <ul>
+                    <li>Token-level SHAP values</li>
+                    <li>Contextual token importance</li>
+                    <li>Integration with transformer-based models</li>
+                </ul>
+            </div>
+
+            <div class="steps">
+                <h3>Implementation Steps</h3>
+                <ol>
+                    <li>Initialize TokenSHAP with your pre-trained model</li>
+                    <li>Generate token-level importance scores</li>
+                    <li>Calculate integrated SHAP values</li>
+                    <li>Visualize the results</li>
+                </ol>
+            </div>
+        </section>
+
+        <section id="installation">
+            <h2>Installation</h2>
+            <div class="code-block">
+pip install git+https://github.com/ronigold/TokenSHAP.git
+            </div>
+        </section>
+
+        <section id="usage">
+            <h2>Usage Example</h2>
+            <div class="code-block">
+import torch
+from transformers import AutoModelForSequenceClassification, AutoTokenizer
+from tokenshap import TokenSHAP
+
+# Load your model and tokenizer
+model = AutoModelForSequenceClassification.from_pretrained('bert-base-uncased')
+tokenizer = AutoTokenizer.from_pretrained('bert-base-uncased')
+
+# Initialize TokenSHAP
+explainer = TokenSHAP(model, tokenizer)
+
+# Generate explanations
+text = "Your input text here"
+explanation = explainer.explain(text)
+
+# Visualize results
+explainer.visualize(explanation)
+            </div>
+        </section>
+
+        <section id="results">
+            <h2>Results</h2>
+            <div class="image-container">
+                <img src="/api/placeholder/800/400" alt="TokenSHAP Results Visualization">
+                <p><em>Example visualization of token importance scores</em></p>
+            </div>
+            <p>
+                TokenSHAP demonstrates improved interpretability compared to traditional methods by:
+            </p>
+            <ul>
+                <li>Providing more accurate token importance scores</li>
+                <li>Maintaining contextual relationships between tokens</li>
+                <li>Generating intuitive visualizations</li>
+            </ul>
+        </section>
+
+        <section id="requirements">
+            <h2>Requirements</h2>
+            <ul>
+                <li>Python ≥ 3.7</li>
+                <li>PyTorch</li>
+                <li>Transformers</li>
+                <li>SHAP</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>TokenSHAP © 2024 | Created by Roni Goldstein</p>
+            <p>A project for token importance analysis in text classification</p>
+        </div>
+    </footer>
+</body>
+</html>
