@@ -53,9 +53,11 @@ def interact_with_ollama(
         if not api_url:
             raise ValueError('API_URL is not set. Provide it via the api_url variable or as an environment variable.')
 
-    api_endpoint = f"{api_url}/{'chat' if messages else 'generate'}"
+    # Define endpoint based on whether it's a chat or a single generate request
+    api_endpoint = f"{api_url}/api/{'chat' if messages else 'generate'}"
     data = {'model': model, 'stream': stream}
 
+    # Populate the request data
     if messages:
         data['messages'] = messages
     elif prompt:
@@ -65,19 +67,27 @@ def interact_with_ollama(
     else:
         raise ValueError("Either messages for chat or a prompt for generate must be provided.")
 
+    # Send request
     response = requests.post(api_endpoint, json=data, stream=stream)
     if response.status_code != 200:
         output_handler(f"Failed to retrieve data: {response.status_code}")
         return ""
 
+    # Handle streaming or non-streaming responses
     full_response = ""
-    for line in response.iter_lines():
-        if line:
-            json_response = json.loads(line.decode('utf-8'))
-            response_part = json_response.get('response', '') or json_response.get('message', {}).get('content', '')
-            full_response += response_part
-            output_handler(response_part)
-            if json_response.get('done', False):
-                break
+    if stream:
+        for line in response.iter_lines():
+            if line:
+                json_response = json.loads(line.decode('utf-8'))
+                response_part = json_response.get('response', '') or json_response.get('message', {}).get('content', '')
+                full_response += response_part
+                output_handler(response_part)
+                if json_response.get('done', False):
+                    break
+    else:
+        json_response = response.json()
+        response_part = json_response.get('response', '') or json_response.get('message', {}).get('content', '')
+        full_response += response_part
+        output_handler(response_part)
 
     return full_response, response

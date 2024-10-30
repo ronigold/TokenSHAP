@@ -17,6 +17,10 @@ import numpy as np
 import colorsys
 import os
 
+def get_text_before_last_underscore(token):
+    # Find the last occurrence of '_' and slice up to that position
+    return token.rsplit('_', 1)[0]
+
 class TokenSHAP:
     def __init__(self, model_name, ollama_api_url, tokenizer_path=None):
         if tokenizer_path:
@@ -154,7 +158,7 @@ class TokenSHAP:
         
         for token, value in shapley_values.items():
             color = get_color(value)
-            print(f"\033[38;2;{int(color[1:3], 16)};{int(color[3:5], 16)};{int(color[5:7], 16)}m{token.split('_')[0]}\033[0m", end=' ')
+            print(f"\033[38;2;{int(color[1:3], 16)};{int(color[3:5], 16)};{int(color[5:7], 16)}m{get_text_before_last_underscore(token)}\033[0m", end=' ')
         print()
 
     def _get_color(self, value, shapley_values):
@@ -193,7 +197,36 @@ class TokenSHAP:
         plt.tight_layout()
         plt.show()
 
+    def highlight_text_background(self):
+        """
+        Print each token in shapley_values with a background color 
+        that varies from light yellow (near-white) to bright yellow based on the Shapley value.
+        The color scale uses exponential scaling for more pronounced color differences.
+        """
+        min_value = min(self.shapley_values.values())
+        max_value = max(self.shapley_values.values())
+        
+        def get_background_color(value):
+            # Normalize value to 0-1 range and apply cubic scaling
+            norm_value = ((value - min_value) / (max_value - min_value)) ** 3
+            
+            # Define color transition from white to bright yellow
+            r = 255  # Red remains at maximum
+            g = 255  # Green remains at maximum
+            b = int(255 - (norm_value * 255))  # Blue fades to zero based on scaled norm_value
+            
+            # Convert RGB values to ANSI background color format
+            return f"\033[48;2;{r};{g};{b}m"
+        
+        for token, value in self.shapley_values.items():
+            background_color = get_background_color(value)
+            reset_color = "\033[0m"  # Reset color after each token
+            print(f"{background_color}{get_text_before_last_underscore(token)}{reset_color}", end=' ')
+        print()
+
     def analyze(self, prompt, splitter=None, sampling_ratio=0.3, print_result = False):
+        if splitter is None and not hasattr(self, 'tokenizer'):
+            raise ValueError("Splitter cannot be None if no tokenizer is provided.")
         self.baseline_text = self._calculate_baseline(prompt)
         token_combinations_results = self._get_result_per_token_combination(prompt, splitter, sampling_ratio)
         df_per_token_combination = self._get_df_per_token_combination(token_combinations_results, self.baseline_text)
