@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='TokenSHAP',
-    version='0.2.1',
+    version='0.2.2',
     author='Roni Goldshmidt',
     author_email='roni.goldshmidt@getnexar.com',
     description='Paper Implementation: "TokenSHAP: Interpreting Large Language Models with Monte Carlo Shapley Value Estimation"',
