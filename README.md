@@ -36,21 +36,41 @@ pip install -r requirements.txt
 
 ## Usage
 
-TokenSHAP is easy to use with any model that supports SHAP value computation for NLP. Here's a quick guide:
+TokenSHAP is easy to use with any model that supports SHAP value computation for NLP. 
+Here's a quick guide:
+
+- Local Model Usage:
 
 ```python
 # Import TokenSHAP
 from token_shap import TokenSHAP
 
-# Initialize with your model & tokenizer
-model_name = "llama3"
-tokenizer_path = "NousResearch/Hermes-2-Theta-Llama-3-8B"
-ollama_api_url = "http://localhost:11434"  # Default Ollama API URL
-tshap = TokenSHAP(model_name, tokenizer_path, ollama_api_url)
+model_name_or_path = "meta-llama/Llama-3.2-3B-Instruct"
+model = LocalModel(model_name_or_path)
+splitter = StringSplitter()
+token_shap = TokenSHAP(model, splitter)
 
 # Analyze token importance
 prompt = "Why is the sky blue?"
-results = tshap.analyze(prompt)
+df = token_shap.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)
+```
+
+- API Model Usage:
+
+```python
+# Import TokenSHAP
+from token_shap import TokenSHAP
+
+model_name = "llama3.2:3b"
+api_url = "http://localhost:11434"
+
+api_model = OllamaModel(model_name=model_name, api_url=api_url)
+splitter = StringSplitter()
+token_shap_api = TokenSHAP(api_model, splitter, debug=False)
+
+# Analyze token importance
+prompt = "Why is the sky blue?"
+df = token_shap_api.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)
 ```
 
 Results will include SHAP values for each token, indicating their contribution to the model's output.
