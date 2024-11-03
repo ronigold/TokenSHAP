@@ -1,6 +1,5 @@
 from itertools import combinations
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from ollama_interact import interact_with_ollama
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
