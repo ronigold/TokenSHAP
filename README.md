@@ -54,6 +54,7 @@ token_shap = TokenSHAP(model, splitter)
 prompt = "Why is the sky blue?"
 df = token_shap.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)
 ```
+![Output1](data/local_out.png)
 
 - API Model Usage:
 
@@ -71,6 +72,7 @@ token_shap_api = TokenSHAP(api_model, splitter, debug=False)
 prompt = "Why is the sky blue?"
 df = token_shap_api.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)
 ```
+![Output2](data/api_out.png)
 
 Results will include SHAP values for each token, indicating their contribution to the model's output.
 
