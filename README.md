@@ -12,12 +12,6 @@ TokenSHAP offers a novel method for interpreting large language models (LLMs) us
 
 The method introduces an efficient way to estimate the importance of tokens based on Shapley values, providing interpretable, quantitative measures of token importance. It addresses the combinatorial complexity of language inputs and demonstrates efficacy across various prompts and LLM architectures. TokenSHAP represents a significant advancement in making AI more transparent and trustworthy, particularly in critical applications such as healthcare diagnostics, legal analysis, and automated decision-making systems.
 
-## Prerequisites
-
-Before installing TokenSHAP, you need to have Ollama deployed and running. Ollama is required for TokenSHAP to interact with large language models.
-
-To install and set up Ollama, please follow the instructions in the [Ollama GitHub repository](https://github.com/ollama/ollama).
-
 ## Installation
 
 You can install TokenSHAP directly from PyPI using pip:
