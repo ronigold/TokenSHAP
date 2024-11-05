@@ -43,7 +43,7 @@ Here's a quick guide:
 
 ```python
 # Import TokenSHAP
-from token_shap import TokenSHAP
+from token_shap import *
 
 model_name_or_path = "meta-llama/Llama-3.2-3B-Instruct"
 model = LocalModel(model_name_or_path)
@@ -59,8 +59,7 @@ df = token_shap.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)
 
 ```python
 # Import TokenSHAP
-from token_shap import TokenSHAP
-
+from token_shap import *
 model_name = "llama3.2:3b"
 api_url = "http://localhost:11434"
 
