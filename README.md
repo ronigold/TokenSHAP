@@ -54,7 +54,7 @@ token_shap = TokenSHAP(model, splitter)
 prompt = "Why is the sky blue?"
 df = token_shap.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)
 ```
-![Output1](data/local_out.png)
+<img src="data/local_out.png" alt="Output1" width="800" height="100"/>
 
 - API Model Usage:
 
