@@ -72,7 +72,7 @@ token_shap_api = TokenSHAP(api_model, splitter, debug=False)
 prompt = "Why is the sky blue?"
 df = token_shap_api.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)
 ```
-![Output2](data/api_out.png)
+<img src="data/api_out.png" alt="Output1" width="200" height="28"/>
 
 Results will include SHAP values for each token, indicating their contribution to the model's output.
 
