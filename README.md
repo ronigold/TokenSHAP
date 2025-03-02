@@ -25,7 +25,12 @@ Alternatively, to install from source:
 ```bash
 git clone https://github.com/ronigold/TokenSHAP.git
 cd TokenSHAP
-pip install -r requirements.txt
+pip install .
+```
+
+For development purposes, you can install it in editable mode instead:
+```bash
+pip install -e .
 ```
 
 ## Usage
