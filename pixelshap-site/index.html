@@ -3,15 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TokenSHAP: Interpreting Large Language Models</title>
+    <title>PixelSHAP: Interpreting Vision-Language Models</title>
     <style>
         :root {
             --primary-color: #2563eb;
+            --secondary-color: #4338ca;
+            --accent-color: #8b5cf6;
             --text-color: #1f2937;
             --background-color: #ffffff;
             --secondary-bg: #f3f4f6;
             --code-bg: #1f2937;
             --max-width: 64rem;
+            --hover-transition: all 0.3s ease;
         }
         
         * {
@@ -36,43 +39,53 @@
         header {
             text-align: center;
             padding: 5rem 0 2.5rem;
+            background: linear-gradient(135deg, #4338ca, #2563eb);
+            color: white;
+            margin-bottom: 3rem;
         }
 
         h1 {
-            font-size: 2.5rem;
-            font-weight: 700;
+            font-size: 3.5rem;
+            font-weight: 800;
             margin-bottom: 1.25rem;
-            color: var(--primary-color);
+            color: white;
+            letter-spacing: -0.025em;
         }
 
-        .subtitle {
-            font-size: 1.25rem;
-            color: var(--text-color);
-            margin-bottom: 1.5rem;
+        header .subtitle {
+            font-size: 1.5rem;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 2rem;
+            max-width: 48rem;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .authors {
-            margin: 1.5rem 0;
+            margin: 2rem 0;
         }
 
         .author {
             display: inline-block;
-            margin: 0.5rem 0;
+            margin: 0.5rem 1rem;
         }
 
         .author-name {
-            color: var(--primary-color);
-            font-weight: 500;
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
         }
 
         .author-affiliation {
-            color: #6b7280;
-            margin-left: 0.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-left: 0.25rem;
         }
 
         .author-email {
-            color: #6b7280;
-            margin-left: 0.5rem;
+            color: rgba(255, 255, 255, 0.8);
+            margin-left: 0.25rem;
+            font-size: 0.9rem;
+            display: block;
         }
 
         .links {
@@ -80,7 +93,7 @@
             justify-content: center;
             gap: 1rem;
             flex-wrap: wrap;
-            margin: 2rem 0;
+            margin: 2.5rem 0 1rem;
         }
 
         .button {
@@ -88,90 +101,263 @@
             padding: 0.75rem 1.5rem;
             border-radius: 0.5rem;
             text-decoration: none;
-            font-weight: 500;
-            transition: background-color 0.2s;
+            font-weight: 600;
+            transition: var(--hover-transition);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .button.primary {
-            background-color: var(--primary-color);
-            color: white;
+            background-color: white;
+            color: var(--primary-color);
         }
 
         .button.primary:hover {
-            background-color: #1d4ed8;
+            background-color: rgba(255, 255, 255, 0.9);
+            transform: translateY(-2px);
+            box-shadow: 0 7px 10px rgba(0, 0, 0, 0.15);
         }
 
         .button.secondary {
-            background-color: var(--secondary-bg);
-            color: var(--primary-color);
+            background-color: rgba(255, 255, 255, 0.1);
+            color: white;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
         .button.secondary:hover {
-            background-color: #e5e7eb;
+            background-color: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+            box-shadow: 0 7px 10px rgba(0, 0, 0, 0.15);
         }
 
         section {
-            margin-bottom: 4rem;
+            margin-bottom: 5rem;
         }
 
         .section-title {
-            font-size: 1.875rem;
+            font-size: 2.25rem;
             font-weight: 700;
             color: var(--primary-color);
             margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .section-subtitle {
+            font-size: 1.5rem;
+            color: var(--text-color);
+            margin-bottom: 2rem;
+            text-align: center;
+            max-width: 48rem;
+            margin-left: auto;
+            margin-right: auto;
         }
 
         .card {
             background-color: var(--secondary-bg);
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            margin-bottom: 1.5rem;
+            padding: 2rem;
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: var(--hover-transition);
+        }
+
+        .card:hover {
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            transform: translateY(-5px);
         }
 
         .feature-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1.5rem;
-            margin-top: 1.5rem;
+            gap: 2rem;
+            margin-top: 2.5rem;
+            margin-bottom: 3rem;
         }
 
         .feature-card {
             background-color: white;
-            padding: 1.5rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: var(--hover-transition);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card:hover {
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.1);
+            transform: translateY(-5px);
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 5px;
+            height: 100%;
+            background: linear-gradient(to bottom, var(--primary-color), var(--accent-color));
         }
 
         .feature-title {
-            font-size: 1.25rem;
+            font-size: 1.5rem;
             font-weight: 600;
             color: var(--primary-color);
-            margin-bottom: 0.75rem;
+            margin-bottom: 1rem;
         }
 
         pre {
             background-color: var(--code-bg);
             color: white;
-            padding: 1rem;
-            border-radius: 0.5rem;
+            padding: 1.5rem;
+            border-radius: 0.75rem;
             overflow-x: auto;
             font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-            font-size: 0.875rem;
-            margin: 1rem 0;
+            font-size: 0.9rem;
+            margin: 1.5rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        pre code {
+            display: block;
+        }
+
+        .img-container {
+            text-align: center;
+            margin: 2.5rem auto;
         }
 
         img {
             max-width: 100%;
             height: auto;
-            border-radius: 0.5rem;
-            margin: 1.5rem 0;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: var(--hover-transition);
+        }
+        
+        img:hover {
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+
+        .method-diagram {
+            padding: 1.5rem;
+            background: var(--secondary-bg);
+            border-radius: 1rem;
+            margin: 3rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .method-diagram-title {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .two-column {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .comparison-section {
+            margin: 4rem 0;
+            padding: 2rem;
+            background: linear-gradient(to right, #f9fafb, #f3f4f6);
+            border-radius: 1rem;
+        }
+
+        .citation-block {
+            background-color: #f8fafc;
+            border-left: 4px solid var(--primary-color);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border-radius: 0 0.5rem 0.5rem 0;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
         }
 
         footer {
             text-align: center;
-            padding: 2.5rem 0;
+            padding: 3rem 0;
+            background-color: #f9fafb;
             color: #6b7280;
-            font-size: 0.875rem;
+            border-top: 1px solid #e5e7eb;
+            margin-top: 5rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin: 1.5rem 0;
+        }
+
+        .footer-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            transition: var(--hover-transition);
+        }
+
+        .footer-link:hover {
+            color: var(--accent-color);
+        }
+
+        .social-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .highlight-text {
+            background: linear-gradient(120deg, rgba(79, 70, 229, 0.2) 0%, rgba(139, 92, 246, 0.2) 100%);
+            border-radius: 0.25rem;
+            padding: 0.2rem 0.4rem;
+            font-weight: 500;
+        }
+
+        .image-gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin: 2.5rem 0;
+        }
+
+        .gallery-item {
+            position: relative;
+            overflow: hidden;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: var(--hover-transition);
+        }
+
+        .gallery-item:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .gallery-item img {
+            width: 100%;
+            display: block;
+            border-radius: 0.75rem;
+        }
+
+        .gallery-caption {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 0.75rem;
+            transform: translateY(100%);
+            transition: var(--hover-transition);
+        }
+
+        .gallery-item:hover .gallery-caption {
+            transform: translateY(0);
         }
 
         @media (max-width: 768px) {
@@ -180,21 +366,71 @@
             }
             
             h1 {
-                font-size: 2rem;
+                font-size: 2.5rem;
             }
             
             .feature-grid {
                 grid-template-columns: 1fr;
             }
+
+            .two-column {
+                grid-template-columns: 1fr;
+            }
+            
+            .button {
+                width: 100%;
+                margin-bottom: 0.75rem;
+                text-align: center;
+            }
+            
+            .links {
+                flex-direction: column;
+            }
+        }
+
+        .paper-abstract {
+            font-style: italic;
+            line-height: 1.8;
+            color: #4b5563;
+            max-width: 52rem;
+            margin: 2rem auto;
+            text-align: justify;
+        }
+
+        .cta-box {
+            background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+            border-radius: 1rem;
+            padding: 3rem 2rem;
+            text-align: center;
+            margin: 4rem 0;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+
+        .cta-title {
+            font-size: 1.875rem;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .badge {
+            display: inline-block;
+            background-color: var(--accent-color);
+            color: white;
+            font-size: 0.75rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 9999px;
+            margin-left: 0.5rem;
+            vertical-align: middle;
         }
     </style>
 </head>
 <body>
     <header>
         <div class="container">
-            <h1>TokenSHAP</h1>
+            <h1>PixelSHAP</h1>
             <p class="subtitle">
-                Interpreting Large Language Models with Monte Carlo Shapley Value Estimation
+                Interpreting Vision-Language Models with Object-Level Shapley Value Estimation
             </p>
             
             <div class="authors">
@@ -203,18 +439,11 @@
                     <span class="author-affiliation">Nexar</span>
                     <span class="author-email">roni.goldshmidt@getnexar.com</span>
                 </div>
-                <br>
-                <div class="author">
-                    <span class="author-name">Miriam Horovicz</span>
-                    <span class="author-affiliation">NI</span>
-                    <span class="author-email">miryam.hor@gmail.com</span>
-                </div>
             </div>
 
             <div class="links">
                 <a href="https://github.com/ronigold/TokenSHAP" class="button primary">GitHub</a>
-                <a href="https://arxiv.org/abs/2407.10114" class="button secondary">Paper</a>
-                <a href="https://medium.com/@ronigoldsmid/unlocking-the-black-box-tokenshap-peek-inside-llms-0515c570917b" class="button secondary">Blog</a>
+                <a href="https://arxiv.org/pdf/2503.06670" class="button secondary">Paper</a>
             </div>
         </div>
     </header>
@@ -222,46 +451,143 @@
     <main class="container">
         <!-- About section -->
         <section>
-            <h2 class="section-title">About TokenSHAP</h2>
-            <div class="card">
-                <p>
-                    The method introduces an efficient way to estimate the importance of tokens based on Shapley values, 
-                    providing interpretable, quantitative measures of token importance. It addresses the combinatorial 
-                    complexity of language inputs and demonstrates efficacy across various prompts and LLM architectures.
-                </p>
-                <br>
-                <p>
-                    TokenSHAP represents a significant advancement in making AI more transparent and trustworthy, 
-                    particularly in critical applications such as healthcare diagnostics, legal analysis, and automated 
-                    decision-making systems.
-                </p>
-                <img src="data/TokenSHAP_flow.png" alt="Tokens Architecture">
+            <h2 class="section-title">About PixelSHAP</h2>
+            <p class="paper-abstract">
+                Interpretability in Vision-Language Models (VLMs) is essential for building trust, enabling debugging, and supporting critical decision-making in high-stakes applications. We introduce PixelSHAP, a powerful model-agnostic framework that extends Shapley-based analysis to structured visual entities. While TokenSHAP successfully applies to text prompts, PixelSHAP advances this approach for vision-based reasoning by systematically analyzing image objects and precisely quantifying their influence on a VLM's response.
+            </p>
+            <div class="img-container">
+                <img src="PixelSHAP_flow_diagram.png" alt="PixelSHAP Flow Diagram">
             </div>
         </section>
 
         <!-- Key Features -->
         <section>
             <h2 class="section-title">Key Features</h2>
+            <p class="section-subtitle">PixelSHAP provides unprecedented insight into how vision-language models process and interpret visual information</p>
+            
             <div class="feature-grid">
                 <div class="feature-card">
-                    <h3 class="feature-title">Interpretability for LLMs</h3>
+                    <h3 class="feature-title">Object-Level Explainability</h3>
                     <p>
-                        Delivers a methodical approach to understanding how individual components of input affect LLM outputs.
+                        The first model-agnostic interpretability framework for text-generative VLMs, integrating segmentation-based perturbations with Shapley value estimation.
                     </p>
                 </div>
                 <div class="feature-card">
-                    <h3 class="feature-title">Monte Carlo Shapley Estimation</h3>
+                    <h3 class="feature-title">Visual Attribution</h3>
                     <p>
-                        Utilizes a Monte Carlo approach to efficiently compute Shapley values for tokens, suitable for 
-                        extensive texts and large models.
+                        Provides intuitive visualization of object contributions, allowing users to analyze model decisions through heatmaps and object masks.
                     </p>
                 </div>
                 <div class="feature-card">
-                    <h3 class="feature-title">Versatile Application</h3>
+                    <h3 class="feature-title">Model Agnostic</h3>
                     <p>
-                        Applicable across various LLM architectures and prompt types, from factual questions to complex 
-                        multi-sentence inputs.
+                        Works with any black-box VLM including GPT-4o, Gemini, and open-source models like LLaVA and LLaMA, requiring only input-output access.
                     </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Improved Trustworthiness</h3>
+                    <p>
+                        By identifying which objects influenced a model's output, PixelSHAP enhances transparency in vision-language decision-making.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Computational Efficiency</h3>
+                    <p>
+                        Significantly improves on traditional pixel-level approaches by shifting to object-level perturbations, making analysis faster and more tractable.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Context-Sensitive Attribution</h3>
+                    <p>
+                        Adapts importance attributions based on specific queries, highlighting different objects as relevant depending on the question context.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Method section -->
+        <section>
+            <h2 class="section-title">How PixelSHAP Works</h2>
+            
+            <div class="method-diagram">
+                <h3 class="method-diagram-title">The PixelSHAP Framework</h3>
+                <div class="img-container">
+                    <img src="/api/placeholder/1000/500" alt="PixelSHAP Method Diagram">
+                </div>
+            </div>
+            
+            <div class="two-column">
+                <div>
+                    <h3 class="feature-title">Object Detection & Segmentation</h3>
+                    <p>
+                        PixelSHAP uses GroundingDINO and SAM to identify and precisely segment objects within images, creating a set of meaningful visual entities for analysis.
+                    </p>
+                    <p>
+                        This approach shifts from analyzing thousands of individual pixels to focusing on a limited number of semantically meaningful objects, drastically improving computational efficiency.
+                    </p>
+                </div>
+                <div class="img-container">
+                    <img src="/api/placeholder/450/300" alt="Object Segmentation Example">
+                </div>
+            </div>
+            
+            <div class="two-column">
+                <div class="img-container">
+                    <img src="/api/placeholder/450/300" alt="Selective Masking Example">
+                </div>
+                <div>
+                    <h3 class="feature-title">Selective Object Masking</h3>
+                    <p>
+                        PixelSHAP systematically masks different object combinations and analyzes their impact on the VLM's response, using our innovative Bounding Box with Overlap Avoidance (BBOA) masking strategy.
+                    </p>
+                    <p>
+                        This approach balances complete occlusion of target objects while preserving adjacent objects, enabling more accurate attribution of importance.
+                    </p>
+                </div>
+            </div>
+            
+            <div class="two-column">
+                <div>
+                    <h3 class="feature-title">Shapley Value Computation</h3>
+                    <p>
+                        PixelSHAP computes Shapley values for each object, quantifying its contribution to the VLM's response using cosine similarity between text embeddings.
+                    </p>
+                    <p>
+                        The final Shapley values provide a principled measure of each object's importance, enabling fine-grained attribution without requiring access to internal model representations.
+                    </p>
+                </div>
+                <div class="img-container">
+                    <img src="/api/placeholder/450/300" alt="Shapley Value Visualization">
+                </div>
+            </div>
+        </section>
+
+        <!-- Use Cases -->
+        <section>
+            <h2 class="section-title">Application Examples</h2>
+            
+            <div class="image-gallery">
+                <div class="gallery-item">
+                    <img src="autonomous_driving_use_case.png" alt="Autonomous driving use case">
+                    <div class="gallery-caption">Autonomous Driving Scene Analysis</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="/api/placeholder/450/300" alt="Medical diagnosis use case">
+                    <div class="gallery-caption">Medical Imaging Interpretation</div>
+                </div>
+                <div class="gallery-item">
+                    <img src="/api/placeholder/450/300" alt="Surveillance analysis use case">
+                    <div class="gallery-caption">Security & Surveillance</div>
+                </div>
+            </div>
+            
+            <div class="comparison-section">
+                <h3 class="feature-title" style="text-align: center; margin-bottom: 2rem;">Context-Sensitive Interpretation</h3>
+                <p style="text-align: center; margin-bottom: 2rem;">
+                    When asked different questions about the same scene, PixelSHAP highlights different objects as important to the model's response, demonstrating context-awareness in attribution.
+                </p>
+                <div class="img-container">
+                    <img src="/api/placeholder/900/400" alt="Context-sensitive attribution examples">
                 </div>
             </div>
         </section>
@@ -270,13 +596,10 @@
         <section>
             <h2 class="section-title">Installation</h2>
             <div class="card">
-                <p>Install from PyPI:</p>
-                <pre>pip install tokenshap</pre>
-                
-                <p>Or install from source:</p>
-                <pre>git clone https://github.com/ronigold/TokenSHAP.git
+                <p>Install from source:</p>
+                <pre><code>git clone https://github.com/ronigold/TokenSHAP.git
 cd TokenSHAP
-pip install -r requirements.txt</pre>
+pip install -r requirements.txt</code></pre>
             </div>
         </section>
 
@@ -284,55 +607,165 @@ pip install -r requirements.txt</pre>
         <section>
             <h2 class="section-title">Usage Examples</h2>
             <div class="card">
-                <h3 class="feature-title">Local Model Usage</h3>
-                <pre># Import TokenSHAP
-from token_shap import *
+                <h3 class="feature-title">Basic Usage</h3>
+                <pre><code># Import PixelSHAP
+from pixel_shap import *
 
-model_name_or_path = "meta-llama/Llama-3.2-3B-Instruct"
-model = LocalModel(model_name_or_path)
-splitter = StringSplitter()
-token_shap = TokenSHAP(model, splitter)
+# Initialize the components
+vlm = GPT4Vision(api_key="your-api-key")
+segmentation_model = GroundingDINOSAM()
+manipulator = BoundingBoxOverlapAvoidance()
+vectorizer = OpenAIEmbedding("text-embedding-3-small")
 
-# Analyze token importance
-prompt = "Why is the sky blue?"
-df = token_shap.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)</pre>
-                <img src="data/local_out.png" alt="Local model output">
+# Create PixelSHAP instance
+pixel_shap = PixelSHAP(
+    model=vlm,
+    segmentation_model=segmentation_model,
+    manipulator=manipulator,
+    vectorizer=vectorizer,
+    debug=False,
+    temp_dir='example_temp'
+)
 
-                <h3 class="feature-title">API Model Usage</h3>
-                <pre># Import TokenSHAP
-from token_shap import *
-model_name = "llama3.2:3b"
-api_url = "http://localhost:11434"
+# Analyze an image
+results_df, shapley_values = pixel_shap.analyze(
+    image_path="example.jpg",
+    prompt="What's happening in this image?",
+    sampling_ratio=0.5,
+    max_combinations=20,
+    cleanup_temp_files=True
+)
 
-api_model = OllamaModel(model_name=model_name, api_url=api_url)
-splitter = StringSplitter()
-token_shap_api = TokenSHAP(api_model, splitter, debug=False)
-
-# Analyze token importance
-prompt = "Why is the sky blue?"
-df = token_shap_api.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)</pre>
-                <img src="data/api_out.png" alt="API model output">
+# Visualize the results
+pixel_shap.visualize(
+    background_opacity=0.5,
+    show_original_side_by_side=True,
+    show_labels=True,
+    show_model_output=True
+)</code></pre>
+                <div class="img-container">
+                    <img src="/api/placeholder/800/400" alt="PixelSHAP output example">
+                </div>
             </div>
         </section>
+
+        <!-- Results and Evaluation -->
+        <section>
+            <h2 class="section-title">Results and Evaluation</h2>
+            <p class="section-subtitle">PixelSHAP outperforms baseline methods across various metrics and models</p>
+            
+            <div class="img-container">
+                <img src="/api/placeholder/900/500" alt="Performance comparison chart">
+            </div>
+            
+            <p style="text-align: center; margin-top: 1rem; font-style: italic; color: #6b7280;">
+                Performance comparison across different VLMs and masking strategies
+            </p>
+            
+            <div class="two-column" style="margin-top: 3rem;">
+                <div>
+                    <h3 class="feature-title">Key Findings</h3>
+                    <ul style="list-style-position: inside; margin-left: 1rem;">
+                        <li>Bounding Box with Overlap Avoidance (BBOA) consistently outperforms other masking strategies</li>
+                        <li>PixelSHAP significantly outperforms baseline heuristics across all models and metrics</li>
+                        <li>Commercial VLMs show higher attribution accuracy than open-source models</li>
+                        <li>Results demonstrate strong correlation between overall model capability and attribution accuracy</li>
+                    </ul>
+                </div>
+                <div>
+                    <h3 class="feature-title">Processing Time</h3>
+                    <p>
+                        PixelSHAP achieves practical efficiency with average processing times of less than one minute per image (15-74 seconds depending on the VLM), making it suitable for both research and production applications.
+                    </p>
+                    <p>
+                        For time-sensitive applications, the number of samples can be further reduced with minimal impact on attribution accuracy.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Future Directions -->
+        <section>
+            <h2 class="section-title">Future Research Directions</h2>
+            
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3 class="feature-title">Attribute-Level Attribution</h3>
+                    <p>
+                        Extending beyond object-level analysis to understand how specific visual attributes (color, texture, shape) influence model responses.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Temporal Analysis</h3>
+                    <p>
+                        Adapting PixelSHAP for video understanding to track how object importance evolves over time, critical for understanding dynamic scene interpretation.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Interactive Explainability</h3>
+                    <p>
+                        Developing interfaces that allow users to interactively explore object attributions, enabling more intuitive understanding of model reasoning.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Cross-Modal Attribution</h3>
+                    <p>
+                        Extending the framework to jointly analyze the relative importance of visual and textual elements in multimodal reasoning.
+                    </p>
+                </div>
+            </div>
+        </section>
+        
+        <!-- CTA Box -->
+        <div class="cta-box">
+            <h3 class="cta-title">Try PixelSHAP Today</h3>
+            <p style="margin-bottom: 2rem;">
+                Gain unprecedented insight into how vision-language models perceive and reason about the visual world. Perfect for researchers, developers, and practitioners working with multimodal AI systems.
+            </p>
+            <a href="https://github.com/ronigold/TokenSHAP" class="button primary">Get Started on GitHub</a>
+        </div>
 
         <!-- Citation -->
         <section>
             <h2 class="section-title">Citation</h2>
-            <div class="card">
-                <p>If you use TokenSHAP in your research, please cite our paper:</p>
-                <pre>@article{goldshmidt2024tokenshap,
+            <div class="citation-block">
+                <p>If you use PixelSHAP in your research, please cite our paper:</p>
+                <pre><code>@article{goldshmidt2025pixelshap,
+  title={Attention, Please! PixelSHAP Reveals What Vision-Language Models Actually Focus On},
+  author={Goldshmidt, Roni},
+  journal={arXiv preprint arXiv:2503.06670},
+  year={2025}
+}</code></pre>
+            </div>
+
+            <p style="margin-top: 2rem;">
+                For the original TokenSHAP method, please cite:
+            </p>
+            <div class="citation-block">
+                <pre><code>@article{goldshmidt2024tokenshap,
   title={TokenSHAP: Interpreting Large Language Models with Monte Carlo Shapley Value Estimation},
   author={Goldshmidt, Roni and Horovicz, Miriam},
   journal={arXiv preprint arXiv:2407.10114},
   year={2024}
-}</pre>
+}</code></pre>
             </div>
         </section>
     </main>
 
     <footer>
         <div class="container">
-            <p>TokenSHAP © 2024 - MIT License</p>
+            <p>PixelSHAP © 2025 - MIT License</p>
+            
+            <div class="footer-links">
+                <a href="#" class="footer-link">Contact</a>
+                <a href="https://github.com/ronigold/TokenSHAP" class="footer-link">GitHub</a>
+                <a href="https://arxiv.org/abs/2503.06670" class="footer-link">Paper</a>
+                <a href="#" class="footer-link">Blog</a>
+            </div>
+            
+            <p style="margin-top: 2rem;">
+                PixelSHAP is part of the larger <a href="https://github.com/ronigold/TokenSHAP" style="color: var(--primary-color); text-decoration: none;">TokenSHAP project</a>, which provides comprehensive interpretability tools for language and vision-language models.
+            </p>
         </div>
     </footer>
 </body>
