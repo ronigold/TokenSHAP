@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TokenSHAP: Interpreting Large Language Models</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --text-color: #1f2937;
+            --background-color: #ffffff;
+            --secondary-bg: #f3f4f6;
+            --code-bg: #1f2937;
+            --max-width: 64rem;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6;
+            color: var(--text-color);
+            background-color: var(--background-color);
+        }
+
+        .container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        header {
+            text-align: center;
+            padding: 5rem 0 2.5rem;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1.25rem;
+            color: var(--primary-color);
+        }
+
+        .subtitle {
+            font-size: 1.25rem;
+            color: var(--text-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .authors {
+            margin: 1.5rem 0;
+        }
+
+        .author {
+            display: inline-block;
+            margin: 0.5rem 0;
+        }
+
+        .author-name {
+            color: var(--primary-color);
+            font-weight: 500;
+        }
+
+        .author-affiliation {
+            color: #6b7280;
+            margin-left: 0.5rem;
+        }
+
+        .author-email {
+            color: #6b7280;
+            margin-left: 0.5rem;
+        }
+
+        .links {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+            margin: 2rem 0;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            text-decoration: none;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+
+        .button.primary {
+            background-color: var(--primary-color);
+            color: white;
+        }
+
+        .button.primary:hover {
+            background-color: #1d4ed8;
+        }
+
+        .button.secondary {
+            background-color: var(--secondary-bg);
+            color: var(--primary-color);
+        }
+
+        .button.secondary:hover {
+            background-color: #e5e7eb;
+        }
+
+        section {
+            margin-bottom: 4rem;
+        }
+
+        .section-title {
+            font-size: 1.875rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .card {
+            background-color: var(--secondary-bg);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .feature-card {
+            background-color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .feature-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 0.75rem;
+        }
+
+        pre {
+            background-color: var(--code-bg);
+            color: white;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            overflow-x: auto;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+            font-size: 0.875rem;
+            margin: 1rem 0;
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 0.5rem;
+            margin: 1.5rem 0;
+        }
+
+        footer {
+            text-align: center;
+            padding: 2.5rem 0;
+            color: #6b7280;
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 0 1rem;
+            }
+            
+            h1 {
+                font-size: 2rem;
+            }
+            
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>TokenSHAP</h1>
+            <p class="subtitle">
+                Interpreting Large Language Models with Monte Carlo Shapley Value Estimation
+            </p>
+            
+            <div class="authors">
+                <div class="author">
+                    <span class="author-name">Roni Goldshmidt</span>
+                    <span class="author-affiliation">Nexar</span>
+                    <span class="author-email">roni.goldshmidt@getnexar.com</span>
+                </div>
+                <br>
+                <div class="author">
+                    <span class="author-name">Miriam Horovicz</span>
+                    <span class="author-affiliation">NI</span>
+                    <span class="author-email">miryam.hor@gmail.com</span>
+                </div>
+            </div>
+
+            <div class="links">
+                <a href="https://github.com/ronigold/TokenSHAP" class="button primary">GitHub</a>
+                <a href="https://arxiv.org/abs/2407.10114" class="button secondary">Paper</a>
+                <a href="https://medium.com/@ronigoldsmid/unlocking-the-black-box-tokenshap-peek-inside-llms-0515c570917b" class="button secondary">Blog</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <!-- About section -->
+        <section>
+            <h2 class="section-title">About TokenSHAP</h2>
+            <div class="card">
+                <p>
+                    The method introduces an efficient way to estimate the importance of tokens based on Shapley values, 
+                    providing interpretable, quantitative measures of token importance. It addresses the combinatorial 
+                    complexity of language inputs and demonstrates efficacy across various prompts and LLM architectures.
+                </p>
+                <br>
+                <p>
+                    TokenSHAP represents a significant advancement in making AI more transparent and trustworthy, 
+                    particularly in critical applications such as healthcare diagnostics, legal analysis, and automated 
+                    decision-making systems.
+                </p>
+                <img src="data/TokenSHAP_flow.png" alt="Tokens Architecture">
+            </div>
+        </section>
+
+        <!-- Key Features -->
+        <section>
+            <h2 class="section-title">Key Features</h2>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <h3 class="feature-title">Interpretability for LLMs</h3>
+                    <p>
+                        Delivers a methodical approach to understanding how individual components of input affect LLM outputs.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Monte Carlo Shapley Estimation</h3>
+                    <p>
+                        Utilizes a Monte Carlo approach to efficiently compute Shapley values for tokens, suitable for 
+                        extensive texts and large models.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title">Versatile Application</h3>
+                    <p>
+                        Applicable across various LLM architectures and prompt types, from factual questions to complex 
+                        multi-sentence inputs.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Installation -->
+        <section>
+            <h2 class="section-title">Installation</h2>
+            <div class="card">
+                <p>Install from PyPI:</p>
+                <pre>pip install tokenshap</pre>
+                
+                <p>Or install from source:</p>
+                <pre>git clone https://github.com/ronigold/TokenSHAP.git
+cd TokenSHAP
+pip install -r requirements.txt</pre>
+            </div>
+        </section>
+
+        <!-- Usage -->
+        <section>
+            <h2 class="section-title">Usage Examples</h2>
+            <div class="card">
+                <h3 class="feature-title">Local Model Usage</h3>
+                <pre># Import TokenSHAP
+from token_shap import *
+
+model_name_or_path = "meta-llama/Llama-3.2-3B-Instruct"
+model = LocalModel(model_name_or_path)
+splitter = StringSplitter()
+token_shap = TokenSHAP(model, splitter)
+
+# Analyze token importance
+prompt = "Why is the sky blue?"
+df = token_shap.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)</pre>
+                <img src="data/local_out.png" alt="Local model output">
+
+                <h3 class="feature-title">API Model Usage</h3>
+                <pre># Import TokenSHAP
+from token_shap import *
+model_name = "llama3.2:3b"
+api_url = "http://localhost:11434"
+
+api_model = OllamaModel(model_name=model_name, api_url=api_url)
+splitter = StringSplitter()
+token_shap_api = TokenSHAP(api_model, splitter, debug=False)
+
+# Analyze token importance
+prompt = "Why is the sky blue?"
+df = token_shap_api.analyze(prompt, sampling_ratio=0.0, print_highlight_text=True)</pre>
+                <img src="data/api_out.png" alt="API model output">
+            </div>
+        </section>
+
+        <!-- Citation -->
+        <section>
+            <h2 class="section-title">Citation</h2>
+            <div class="card">
+                <p>If you use TokenSHAP in your research, please cite our paper:</p>
+                <pre>@article{goldshmidt2024tokenshap,
+  title={TokenSHAP: Interpreting Large Language Models with Monte Carlo Shapley Value Estimation},
+  author={Goldshmidt, Roni and Horovicz, Miriam},
+  journal={arXiv preprint arXiv:2407.10114},
+  year={2024}
+}</pre>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>TokenSHAP © 2024 - MIT License</p>
+        </div>
+    </footer>
+</body>
+</html>
