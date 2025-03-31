@@ -16,12 +16,14 @@ These tools are essential for understanding the decision-making process of LLMs 
 
 TokenSHAP provides fine-grained interpretability for language models using Monte Carlo Shapley value estimation over input tokens.
 
-![TokenSHAP Architecture](data/TokenSHAP_flow.png)
+![TokenSHAP Example Output](data/tokenshap_example.png)
 
 ### Key Features
 - Estimates token importance using cooperative game theory
 - Highlights which parts of a prompt contributed most to the generated response
 - Compatible with both local and API-based LLMs
+
+![TokenSHAP Architecture](data/TokenSHAP_flow.png)
 
 ### Example Usage
 ```python
@@ -50,7 +52,7 @@ df = token_shap_api.analyze("Why is the sky blue?", sampling_ratio=0.0)
 
 PixelSHAP is an object-level interpretability framework for **text-generating vision-language models**. It attributes Shapley values to visual objects based on their contribution to the model's response.
 
-![PixelSHAP Example Output](data/pixelshap_example.png)
+![PixelSHAP Examples](data/pixelshap_example.png)
 
 
 ### What Makes PixelSHAP Unique?
@@ -89,6 +91,8 @@ pixel_shap.visualize(
     show_model_output=True
 )
 ```
+
+![PixelSHAP Example Output](data/pixelshap_plot.png)
 
 ---
 
