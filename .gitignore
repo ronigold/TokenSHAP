@@ -1,1 +1,8 @@
 .ipynb_checkpoints/
+# Ignore outputs
+*.mp4
+*.jpg
+*.png
+*.pt
+__pycache__/
+notebooks/dynamic_sam2_results/

@@ -16,7 +16,7 @@ These tools are essential for understanding the decision-making process of LLMs 
 
 TokenSHAP provides fine-grained interpretability for language models using Monte Carlo Shapley value estimation over input tokens.
 
-![TokenSHAP Example Output](data/tokenshap_example.png)
+![TokenSHAP Example Output](data/tokenshap_example.jpg)
 
 ### Key Features
 - Estimates token importance using cooperative game theory
