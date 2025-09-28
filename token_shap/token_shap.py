@@ -7,7 +7,7 @@ import re
 import matplotlib.pyplot as plt
 from matplotlib import colors
 from tqdm.auto import tqdm
-from base import BaseSHAP, TextVectorizer, ModelBase
+from .base import BaseSHAP, TextVectorizer, ModelBase
 
 def get_text_before_last_underscore(token: str) -> str:
     """Helper function to get text before last underscore"""

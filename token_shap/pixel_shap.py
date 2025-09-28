@@ -7,9 +7,9 @@ from pathlib import Path
 import cv2
 import os
 from tqdm.auto import tqdm
-from base import BaseSHAP, TextVectorizer, ModelBase
-from image_utils import BaseSegmentationModel, SegmentationBased
-from visualization import PixelSHAPVisualizer
+from .base import BaseSHAP, TextVectorizer, ModelBase
+from .image_utils import BaseSegmentationModel, SegmentationBased
+from .visualization import PixelSHAPVisualizer
 
 class PixelSHAP(BaseSHAP):
     """Analyzes object importance in images using segmentation masks"""

@@ -8,22 +8,11 @@ from abc import ABC, abstractmethod
 import torch
 from torchvision.ops import box_convert
 import torchvision.transforms as transforms
+import os
+import sys
 
-# Import computer vision related libraries
-try:
-    import sys, os
-    sys.path.append(os.environ["DYNAMIC_SAM2_PATH"])
-
-    from dynamic_sam2.sam2_video_tracker import Sam2VideoTracker
-    from dynamic_sam2.object_detection import YOLODetectionModel, DinoDetectionModel
-    from sam2.build_sam import build_sam2
-    from sam2.sam2_image_predictor import SAM2ImagePredictor
-    from grounding_dino.groundingdino.models.GroundingDINO.ms_deform_attn import (
-        multi_scale_deformable_attn_pytorch,
-        MultiScaleDeformableAttnFunction
-    )
-except ImportError:
-    print("Warning: Some optional dependencies (sam2, grounding_dino) not installed, Please provide your own segmentation model!")
+# Import Transformers SAM2 - no local file dependencies needed!
+from transformers import Sam2Model, Sam2Processor
 
 class BaseObjectDetector:
     """Base class for object detection models"""
@@ -39,6 +28,74 @@ class BaseObjectDetector:
             Tuple of (bounding boxes in xyxy format, class labels, confidence scores)
         """
         raise NotImplementedError()
+
+# Optional imports for additional functionality
+Sam2VideoTracker = None
+DinoDetectionModel = None
+
+# Try to import YOLO if available
+try:
+    from ultralytics import YOLO as UltralyticsYOLO
+    
+    class YOLODetectionModel(BaseObjectDetector):
+        """YOLO detection model using Ultralytics"""
+        
+        def __init__(self, model_path: str, target_categories: List[str] = None, 
+                     device: str = "cuda", conf_threshold: float = 0.25, 
+                     iou_threshold: float = 0.45, use_yolov8: bool = True):
+            self.model = UltralyticsYOLO(model_path)
+            self.device = device
+            self.conf_threshold = conf_threshold
+            self.iou_threshold = iou_threshold
+            self.target_categories = target_categories if target_categories else []
+            
+        def detect(self, image_path: Union[str, Path]) -> Tuple[Optional[np.ndarray], Optional[List[str]], Optional[List[float]]]:
+            """Detect objects in an image using YOLO"""
+            results = self.model(str(image_path), conf=self.conf_threshold, 
+                                iou=self.iou_threshold, device=self.device)
+            
+            if len(results) == 0 or results[0].boxes is None:
+                return None, None, None
+            
+            boxes = results[0].boxes.xyxy.cpu().numpy()
+            confidences = results[0].boxes.conf.cpu().numpy()
+            class_ids = results[0].boxes.cls.cpu().numpy().astype(int)
+            
+            # Get class names
+            labels = [results[0].names[class_id] for class_id in class_ids]
+            
+            # Filter by target categories if specified
+            if self.target_categories:
+                filtered_indices = [i for i, label in enumerate(labels) 
+                                  if label in self.target_categories]
+                if filtered_indices:
+                    boxes = boxes[filtered_indices]
+                    labels = [labels[i] for i in filtered_indices]
+                    confidences = confidences[filtered_indices]
+                else:
+                    return None, None, None
+            
+            return boxes, labels, confidences.tolist()
+            
+except ImportError:
+    YOLODetectionModel = None
+
+# Only try to import DynamicSAM2 if explicitly configured (for backward compatibility)
+if "DYNAMIC_SAM2_PATH" in os.environ:
+    try:
+        sys.path.append(os.environ["DYNAMIC_SAM2_PATH"])
+        from dynamic_sam2.sam2_video_tracker import Sam2VideoTracker
+        from dynamic_sam2.object_detection import YOLODetectionModel, DinoDetectionModel
+    except ImportError as e:
+        print(f"Note: DynamicSAM2 configured but import failed: {e}")
+
+# Try to import Transformers Grounding DINO if available
+if DinoDetectionModel is None:
+    try:
+        from .grounding_dino_transformers import DinoDetectionModel
+        print("Using Transformers Grounding DINO (auto-downloads models)")
+    except ImportError:
+        pass  # Will be None if transformers not available
 
 class BaseSegmentationModel:
     """Base class for object segmentation models"""
@@ -57,57 +114,89 @@ class BaseSegmentationModel:
         raise NotImplementedError()
 
 class Sam2Adapter:
-    """Adapter for SAM2 segmentation model"""
+    """Adapter for SAM2 segmentation model using Transformers"""
     
     def __init__(
         self,
-        sam2_cfg_path: str,
-        sam2_ckpt_path: str,
-        device: str = "cuda"
+        sam2_model_id: str = "facebook/sam2.1-hiera-large",
+        sam2_cfg_path: str = None,  # Deprecated - kept for backward compatibility
+        sam2_ckpt_path: str = None,  # Deprecated - kept for backward compatibility
+        device: str = "cuda",
+        mask_threshold: float = 0.5,  # Higher threshold for cleaner boundaries
+        use_stability_score: bool = True,  # Consider stability in mask selection
+        stability_score_thresh: float = 0.95,  # Minimum stability score
+        remove_small_regions: bool = True,  # Post-process to remove small regions
+        min_region_area: int = 100,  # Minimum area for regions to keep
+        resolve_overlaps: bool = True,  # Resolve overlapping masks
+        overlap_resolution: str = "score",  # How to resolve: "score", "bbox_center", "first"
+        mask_selection: str = "largest",  # How to select from 3 masks: "iou", "largest", "coverage"
+        clip_to_bbox: bool = True  # Whether to clip masks to bounding boxes
     ):
         """
-        Initialize SAM2 adapter
+        Initialize SAM2 adapter using Transformers
         
         Args:
-            sam2_cfg_path: Path to SAM2 config file
-            sam2_ckpt_path: Path to SAM2 checkpoint file
+            sam2_model_id: HuggingFace model ID (e.g., "facebook/sam2.1-hiera-large")
+            sam2_cfg_path: (Deprecated) Legacy parameter, ignored
+            sam2_ckpt_path: (Deprecated) Legacy parameter, ignored
             device: Device to run model on
+            mask_threshold: Threshold for mask binarization (higher = cleaner boundaries)
+            use_stability_score: Whether to consider stability when selecting masks
+            stability_score_thresh: Minimum stability score for mask selection
+            remove_small_regions: Whether to remove small disconnected regions
+            min_region_area: Minimum area for regions to keep
+            resolve_overlaps: Whether to resolve overlapping regions between masks
+            overlap_resolution: Method to resolve overlaps:
+                - "score": Assign to object with higher IoU score
+                - "bbox_center": Assign to object whose bbox center is closer
+                - "first": Keep first object's mask (by order)
         """
         self.device = device
-        self.sam2_cfg_path = sam2_cfg_path
-        self.sam2_ckpt_path = sam2_ckpt_path
+        self.mask_threshold = mask_threshold
+        self.use_stability_score = use_stability_score
+        self.stability_score_thresh = stability_score_thresh
+        self.remove_small_regions = remove_small_regions
+        self.min_region_area = min_region_area
+        self.resolve_overlaps = resolve_overlaps
+        self.overlap_resolution = overlap_resolution
+        self.mask_selection = mask_selection
+        self.clip_to_bbox = clip_to_bbox
+        self.iou_scores = None  # Store IoU scores for overlap resolution
+        
+        # Always use Transformers SAM2
+        if sam2_cfg_path or sam2_ckpt_path:
+            print("Note: sam2_cfg_path and sam2_ckpt_path are deprecated. Using HuggingFace model instead.")
+            
+        # Use provided model ID or default
+        self.sam2_model_id = sam2_model_id if sam2_model_id else "facebook/sam2.1-hiera-large"
+        
         self._initialize_sam2()
         
     def _initialize_sam2(self):
-        """Initialize SAM2 model"""
+        """Initialize SAM2 model from Transformers"""
         try:
-            from sam2.build_sam import build_sam2
-            from sam2.sam2_image_predictor import SAM2ImagePredictor
+            import warnings
+            import logging
             
-            # Fix for missing _C module in MultiScaleDeformableAttention if needed
-            try:
-                from grounding_dino.groundingdino.models.GroundingDINO.ms_deform_attn import (
-                    multi_scale_deformable_attn_pytorch, 
-                    MultiScaleDeformableAttnFunction
-                )
-
-                # Create replacement for MultiScaleDeformableAttnFunction.apply if needed
-                if not hasattr(MultiScaleDeformableAttnFunction, 'apply'):
-                    class DummyFunction:
-                        @staticmethod
-                        def apply(value, spatial_shapes, level_start_index, sampling_locations, attention_weights, im2col_step):
-                            return multi_scale_deformable_attn_pytorch(
-                                value, spatial_shapes, sampling_locations, attention_weights
-                            )
-                    MultiScaleDeformableAttnFunction.apply = DummyFunction.apply
-            except ImportError:
-                # The fix is only needed if using groundingdino with SAM2
-                pass
-                
-            sam2_model = build_sam2(self.sam2_cfg_path, self.sam2_ckpt_path)
-            self.image_predictor = SAM2ImagePredictor(sam2_model)
+            # Suppress the specific warning about model type mismatch
+            # This is expected since all SAM2 models on HuggingFace are video models
+            # but they work fine for image segmentation
+            logging.getLogger("transformers").setLevel(logging.ERROR)
+            
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                # Initialize model and processor from HuggingFace
+                self.model = Sam2Model.from_pretrained(self.sam2_model_id).to(self.device)
+                self.processor = Sam2Processor.from_pretrained(self.sam2_model_id)
+            
+            # Restore logging level
+            logging.getLogger("transformers").setLevel(logging.WARNING)
+            
+            self.model.eval()
         except ImportError as e:
-            raise ImportError(f"SAM2 dependencies not installed: {str(e)}")
+            raise ImportError(f"Transformers library not installed or SAM2 not available: {str(e)}")
+        except Exception as e:
+            raise RuntimeError(f"Failed to load SAM2 model '{self.sam2_model_id}': {str(e)}")
     
     def generate_masks_from_boxes(self, image: np.ndarray, boxes: np.ndarray) -> np.ndarray:
         """
@@ -129,24 +218,299 @@ class Sam2Adapter:
         else:
             image_rgb = image
             
-        self.image_predictor.set_image(image_rgb)
-        masks, _, _ = self.image_predictor.predict(
-            point_coords=None,
-            point_labels=None,
-            box=boxes,
-            multimask_output=False
-        )
+        import torch
+        from PIL import Image
         
-        if masks is None:
+        # Convert numpy array to PIL Image for processor
+        pil_image = Image.fromarray(image_rgb)
+        
+        # Process all boxes at once for consistency
+        # SAM2 expects boxes as nested list: [list of boxes for single image]
+        input_boxes = [boxes.tolist()]  # Single image with multiple boxes
+        
+        # Process inputs
+        inputs = self.processor(
+            images=pil_image,
+            input_boxes=input_boxes,
+            return_tensors="pt"
+        ).to(self.device)
+        
+        # Generate masks with multimask_output=True to get multiple options
+        with torch.no_grad():
+            outputs = self.model(**inputs, multimask_output=True)
+        
+        # Get the predictions
+        pred_masks = outputs.pred_masks.cpu()  # Shape: [batch, num_objects, num_masks, H, W]
+        iou_scores = outputs.iou_scores.cpu()  # Shape: [batch, num_objects, num_masks]
+        
+        # Select best mask for each object with stability consideration
+        batch_idx = 0  # We're processing single image
+        num_objects = pred_masks.shape[1]
+        
+        # Create tensor to hold best masks and scores
+        best_masks = []
+        best_iou_scores = []
+        
+        for obj_idx in range(num_objects):
+            obj_masks = pred_masks[batch_idx, obj_idx]  # Shape: [num_masks, H, W]
+            obj_scores = iou_scores[batch_idx, obj_idx]  # Shape: [num_masks]
+            
+            # Select best mask based on strategy
+            if self.mask_selection == "largest":
+                # Choose mask with most pixels (best coverage)
+                mask_areas = []
+                for mask_idx in range(obj_masks.shape[0]):
+                    # Apply threshold to get binary mask
+                    binary_mask = obj_masks[mask_idx] > self.mask_threshold
+                    area = torch.sum(binary_mask).item()
+                    mask_areas.append(area)
+                best_idx = torch.argmax(torch.tensor(mask_areas))
+                
+            elif self.mask_selection == "coverage":
+                # Choose mask with best coverage within bounding box
+                # Need the bounding box for this
+                if obj_idx < len(boxes):
+                    x1, y1, x2, y2 = boxes[obj_idx].astype(int)
+                    x1, y1 = max(0, x1), max(0, y1)
+                    x2, y2 = min(obj_masks.shape[2], x2), min(obj_masks.shape[1], y2)
+                    
+                    coverages = []
+                    for mask_idx in range(obj_masks.shape[0]):
+                        mask = obj_masks[mask_idx]
+                        # Calculate coverage in bbox region
+                        bbox_mask = mask[y1:y2, x1:x2]
+                        coverage = torch.sum(bbox_mask > self.mask_threshold).item()
+                        coverages.append(coverage)
+                    best_idx = torch.argmax(torch.tensor(coverages))
+                else:
+                    # Fallback to largest if no bbox available
+                    mask_areas = []
+                    for mask_idx in range(obj_masks.shape[0]):
+                        binary_mask = obj_masks[mask_idx] > self.mask_threshold
+                        area = torch.sum(binary_mask).item()
+                        mask_areas.append(area)
+                    best_idx = torch.argmax(torch.tensor(mask_areas))
+                    
+            else:  # "iou" or default
+                # Original behavior - use IoU scores
+                if self.use_stability_score:
+                    # Compute stability scores for each mask
+                    stability_scores = []
+                    for mask_idx in range(obj_masks.shape[0]):
+                        mask = obj_masks[mask_idx]
+                        stability = self._compute_stability_score(mask)
+                        stability_scores.append(stability)
+                    
+                    stability_scores = torch.tensor(stability_scores, device=obj_scores.device)
+                    
+                    # Filter masks by stability threshold
+                    stable_mask = stability_scores >= self.stability_score_thresh
+                    
+                    if stable_mask.any():
+                        # Among stable masks, choose the one with highest IoU
+                        obj_scores_filtered = obj_scores.clone()
+                        obj_scores_filtered[~stable_mask] = -1  # Set unstable masks to low score
+                        best_idx = torch.argmax(obj_scores_filtered)
+                    else:
+                        # If no stable masks, fall back to highest IoU
+                        best_idx = torch.argmax(obj_scores)
+                else:
+                    # Simply use highest IoU score
+                    best_idx = torch.argmax(obj_scores)
+                
+            best_masks.append(obj_masks[best_idx])
+            best_iou_scores.append(obj_scores[best_idx].item())
+        
+        if best_masks:
+            # Stack best masks into single tensor
+            best_masks_tensor = torch.stack(best_masks, dim=0)  # Shape: [num_objects, H, W]
+            
+            # Add batch and channel dimensions for post-processing
+            # post_process_masks expects shape [batch, num_channels, H, W]
+            masks_for_processing = best_masks_tensor.unsqueeze(0).unsqueeze(2)  # Shape: [1, num_objects, 1, H, W]
+            
+            # Post-process all masks at once with our threshold
+            processed_masks = self.processor.post_process_masks(
+                masks_for_processing,
+                inputs["original_sizes"],
+                mask_threshold=self.mask_threshold,
+                binarize=True
+            )
+            
+            # Extract masks from batch output
+            if isinstance(processed_masks, list):
+                masks_np = processed_masks[0]  # Get first (and only) image
+            else:
+                masks_np = processed_masks
+                
+            # Convert to numpy if needed
+            if isinstance(masks_np, torch.Tensor):
+                masks_np = masks_np.numpy()
+            
+            # Remove the extra channel dimension if present
+            # Shape should be [num_objects, 1, H, W] -> [num_objects, H, W]
+            if masks_np.ndim == 4 and masks_np.shape[1] == 1:
+                masks_np = masks_np.squeeze(1)
+            
+            # Ensure each mask is within its bounding box
+            all_masks = []
+            for obj_idx in range(min(len(boxes), masks_np.shape[0])):
+                mask = masks_np[obj_idx]
+                
+                if self.clip_to_bbox:
+                    # Clip mask to bounding box
+                    x1, y1, x2, y2 = boxes[obj_idx].astype(int)
+                    # Ensure bounds are within image
+                    x1, y1 = max(0, x1), max(0, y1)
+                    x2, y2 = min(mask.shape[1], x2), min(mask.shape[0], y2)
+                    
+                    # Create a mask that's only True within the bounding box
+                    clipped_mask = np.zeros_like(mask, dtype=bool)
+                    clipped_mask[y1:y2, x1:x2] = mask[y1:y2, x1:x2]
+                else:
+                    # Use full mask without clipping
+                    clipped_mask = mask
+                
+                # Remove small disconnected regions if requested
+                if self.remove_small_regions:
+                    clipped_mask = self._remove_small_regions(clipped_mask, self.min_region_area)
+                
+                all_masks.append(clipped_mask)
+        else:
+            all_masks = []
+        
+        # Stack all masks
+        if all_masks:
+            masks_array = np.stack(all_masks, axis=0)
+            
+            # Resolve overlaps if requested
+            if self.resolve_overlaps and len(masks_array) > 1:
+                # Use the IoU scores we collected earlier
+                masks_array = self._resolve_overlaps(
+                    masks_array, 
+                    boxes, 
+                    best_iou_scores if len(best_iou_scores) > 0 else None
+                )
+            
+            return masks_array.astype(bool)
+        else:
             return np.zeros((0, image.shape[0], image.shape[1]), dtype=bool)
+    
+    def _compute_stability_score(self, mask: torch.Tensor, threshold_delta: float = 0.05) -> float:
+        """
+        Compute stability score for a mask.
+        A stable mask changes little when the threshold is varied.
+        
+        Args:
+            mask: Mask tensor
+            threshold_delta: Delta for threshold variation
             
-        # Ensure correct shape
-        if masks.ndim == 4:
-            masks = masks.squeeze(1)
-        elif masks.ndim == 2:
-            masks = masks[np.newaxis, ...]
+        Returns:
+            Stability score between 0 and 1
+        """
+        # Compute areas at different thresholds
+        area_original = (mask > 0.0).sum().item()
+        area_high = (mask > threshold_delta).sum().item()
+        area_low = (mask > -threshold_delta).sum().item()
+        
+        if area_low == 0:
+            return 0.0
+        
+        # Stability is ratio of high threshold area to low threshold area
+        stability = area_high / area_low
+        return min(stability, 1.0)
+    
+    def _remove_small_regions(self, mask: np.ndarray, min_area: int) -> np.ndarray:
+        """
+        Remove small disconnected regions from a binary mask.
+        
+        Args:
+            mask: Binary mask
+            min_area: Minimum area for regions to keep
             
-        return masks.astype(bool)
+        Returns:
+            Cleaned mask with small regions removed
+        """
+        from scipy import ndimage
+        
+        # Label connected components
+        labeled, num_features = ndimage.label(mask)
+        
+        if num_features == 0:
+            return mask
+        
+        # Calculate area of each component
+        areas = ndimage.sum(mask, labeled, range(1, num_features + 1))
+        
+        # Keep only components larger than min_area
+        cleaned_mask = np.zeros_like(mask)
+        for i, area in enumerate(areas, 1):
+            if area >= min_area:
+                cleaned_mask[labeled == i] = True
+        
+        return cleaned_mask
+    
+    def _resolve_overlaps(self, masks: np.ndarray, boxes: np.ndarray, iou_scores: Optional[List[float]] = None) -> np.ndarray:
+        """
+        Resolve overlapping regions between masks.
+        
+        Args:
+            masks: Array of binary masks with shape (N, H, W)
+            boxes: Array of bounding boxes with shape (N, 4)
+            iou_scores: Optional list of IoU scores for each mask
+            
+        Returns:
+            Masks with overlaps resolved
+        """
+        n_masks = masks.shape[0]
+        h, w = masks.shape[1:]
+        
+        # Create a priority map to track which mask owns each pixel
+        priority_map = np.zeros((h, w), dtype=np.int32) - 1  # -1 means no owner
+        
+        if self.overlap_resolution == "score" and iou_scores is not None:
+            # Sort masks by IoU score (highest first)
+            priorities = np.argsort(iou_scores)[::-1]
+        elif self.overlap_resolution == "bbox_center":
+            # Sort by distance from bbox center to mask centroid
+            priorities = []
+            for i in range(n_masks):
+                if masks[i].any():
+                    # Calculate mask centroid
+                    y_coords, x_coords = np.where(masks[i])
+                    centroid_y = np.mean(y_coords)
+                    centroid_x = np.mean(x_coords)
+                    
+                    # Calculate bbox center
+                    x1, y1, x2, y2 = boxes[i]
+                    bbox_center_x = (x1 + x2) / 2
+                    bbox_center_y = (y1 + y2) / 2
+                    
+                    # Calculate distance
+                    dist = np.sqrt((centroid_x - bbox_center_x)**2 + (centroid_y - bbox_center_y)**2)
+                    priorities.append((i, dist))
+                else:
+                    priorities.append((i, float('inf')))
+            
+            # Sort by distance (smallest first)
+            priorities = [idx for idx, _ in sorted(priorities, key=lambda x: x[1])]
+        else:  # "first" or default
+            # Process in order
+            priorities = list(range(n_masks))
+        
+        # Assign pixels to masks based on priority
+        for mask_idx in priorities:
+            mask = masks[mask_idx]
+            # Only assign pixels that aren't already owned
+            unowned_pixels = (priority_map == -1) & mask
+            priority_map[unowned_pixels] = mask_idx
+        
+        # Create resolved masks
+        resolved_masks = np.zeros_like(masks)
+        for i in range(n_masks):
+            resolved_masks[i] = (priority_map == i)
+        
+        return resolved_masks
 
 class BaseSam2SegmentationModel(BaseSegmentationModel):
     """
@@ -156,27 +520,48 @@ class BaseSam2SegmentationModel(BaseSegmentationModel):
     def __init__(
         self,
         detector: BaseObjectDetector,
-        sam2_cfg_path: str,
-        sam2_ckpt_path: str,
-        device: str = "cuda"
+        sam2_model_id: str = "facebook/sam2.1-hiera-large",
+        sam2_cfg_path: str = None,  # Deprecated
+        sam2_ckpt_path: str = None,  # Deprecated
+        device: str = "cuda",
+        mask_threshold: float = 0.5,
+        use_stability_score: bool = True,
+        stability_score_thresh: float = 0.95,
+        remove_small_regions: bool = True,
+        min_region_area: int = 100,
+        resolve_overlaps: bool = True,
+        overlap_resolution: str = "score",
+        mask_selection: str = "largest",
+        clip_to_bbox: bool = True
     ):
         """
         Initialize base segmentation model
         
         Args:
             detector: Object detector instance
-            sam2_cfg_path: Path to SAM2 config file
-            sam2_ckpt_path: Path to SAM2 checkpoint file
+            sam2_model_id: HuggingFace model ID (e.g., "facebook/sam2.1-hiera-large")
+            sam2_cfg_path: (Deprecated) Legacy parameter, ignored
+            sam2_ckpt_path: (Deprecated) Legacy parameter, ignored
             device: Device to run models on
         """
         self.detector = detector
         self.device = device
         
-        # Initialize SAM2 adapter
+        # Initialize SAM2 adapter with all parameters
         self.sam2_adapter = Sam2Adapter(
+            sam2_model_id=sam2_model_id,
             sam2_cfg_path=sam2_cfg_path,
             sam2_ckpt_path=sam2_ckpt_path,
-            device=device
+            device=device,
+            mask_threshold=mask_threshold,
+            use_stability_score=use_stability_score,
+            stability_score_thresh=stability_score_thresh,
+            remove_small_regions=remove_small_regions,
+            min_region_area=min_region_area,
+            resolve_overlaps=resolve_overlaps,
+            overlap_resolution=overlap_resolution,
+            mask_selection=mask_selection,
+            clip_to_bbox=clip_to_bbox
         )
     
     def segment(self, image_path: Union[str, Path]) -> Tuple[Optional[np.ndarray], Optional[List[str]], Optional[List[float]], Optional[np.ndarray]]:
@@ -217,21 +602,32 @@ class YoloSam2SegmentationModel(BaseSam2SegmentationModel):
     def __init__(
         self,
         yolo_model_path: str,
-        sam2_cfg_path: str,
-        sam2_ckpt_path: str,
+        sam2_model_id: str = "facebook/sam2.1-hiera-large",
+        sam2_cfg_path: str = None,  # Deprecated
+        sam2_ckpt_path: str = None,  # Deprecated
         target_categories: Optional[List[str]] = None,
         device: str = "cuda",
         conf_threshold: float = 0.25,
         iou_threshold: float = 0.45,
-        use_yolov8: bool = False
+        use_yolov8: bool = False,
+        mask_threshold: float = 0.5,
+        use_stability_score: bool = True,
+        stability_score_thresh: float = 0.95,
+        remove_small_regions: bool = True,
+        min_region_area: int = 100,
+        resolve_overlaps: bool = True,
+        overlap_resolution: str = "score",
+        mask_selection: str = "largest",
+        clip_to_bbox: bool = True
     ):
         """
         Initialize YOLO+SAM2 segmentation model
         
         Args:
             yolo_model_path: Path to YOLO model file
-            sam2_cfg_path: Path to SAM2 config file
-            sam2_ckpt_path: Path to SAM2 checkpoint file
+            sam2_model_id: HuggingFace model ID (e.g., "facebook/sam2.1-hiera-large")
+            sam2_cfg_path: (Deprecated) Legacy parameter, ignored
+            sam2_ckpt_path: (Deprecated) Legacy parameter, ignored
             target_categories: Optional list of target categories to filter detections
             device: Device to run models on
             conf_threshold: Confidence threshold for YOLO
@@ -248,12 +644,22 @@ class YoloSam2SegmentationModel(BaseSam2SegmentationModel):
             use_yolov8=use_yolov8
         )
         
-        # Initialize base class
+        # Initialize base class with all parameters
         super().__init__(
             detector=detector,
+            sam2_model_id=sam2_model_id,
             sam2_cfg_path=sam2_cfg_path,
             sam2_ckpt_path=sam2_ckpt_path,
-            device=device
+            device=device,
+            mask_threshold=mask_threshold,
+            use_stability_score=use_stability_score,
+            stability_score_thresh=stability_score_thresh,
+            remove_small_regions=remove_small_regions,
+            min_region_area=min_region_area,
+            resolve_overlaps=resolve_overlaps,
+            overlap_resolution=overlap_resolution,
+            mask_selection=mask_selection,
+            clip_to_bbox=clip_to_bbox
         )
 
 class DinoSam2SegmentationModel(BaseSam2SegmentationModel):
@@ -264,43 +670,87 @@ class DinoSam2SegmentationModel(BaseSam2SegmentationModel):
     def __init__(
         self,
         text_prompt: str,
-        sam2_cfg_path: str,
-        sam2_ckpt_path: str,
+        sam2_model_id: str = "facebook/sam2.1-hiera-large",
+        sam2_cfg_path: str = None,  # Deprecated
+        sam2_ckpt_path: str = None,  # Deprecated
+        grounding_dino_model: str = None,
         device: str = "cuda",
         box_threshold: float = 0.35,
         text_threshold: float = 0.25,
         dino_cfg_path: str = "../grounding_dino/groundingdino/config/GroundingDINO_SwinT_OGC.py",
-        dino_ckpt_path: str = "../gdino_checkpoints/groundingdino_swint_ogc.pth"
+        dino_ckpt_path: str = "../gdino_checkpoints/groundingdino_swint_ogc.pth",
+        mask_threshold: float = 0.5,
+        use_stability_score: bool = True,
+        stability_score_thresh: float = 0.95,
+        remove_small_regions: bool = True,
+        min_region_area: int = 100,
+        resolve_overlaps: bool = True,
+        overlap_resolution: str = "score",
+        mask_selection: str = "largest",
+        clip_to_bbox: bool = True
     ):
         """
         Initialize Grounding DINO+SAM2 segmentation model
         
         Args:
             text_prompt: Text prompt for object detection
-            sam2_cfg_path: Path to SAM2 config file
-            sam2_ckpt_path: Path to SAM2 checkpoint file
+            sam2_model_id: HuggingFace model ID (e.g., "facebook/sam2.1-hiera-large")
+            sam2_cfg_path: (Deprecated) Legacy parameter, ignored
+            sam2_ckpt_path: (Deprecated) Legacy parameter, ignored
+            grounding_dino_model: HuggingFace model ID for Grounding DINO (e.g., "IDEA-Research/grounding-dino-tiny")
             device: Device to run models on
             box_threshold: Confidence threshold for bounding boxes
             text_threshold: Text similarity threshold
-            dino_cfg_path: Path to Grounding DINO config file
-            dino_ckpt_path: Path to Grounding DINO checkpoint file
+            dino_cfg_path: (Legacy) Path to Grounding DINO config file
+            dino_ckpt_path: (Legacy) Path to Grounding DINO checkpoint file
         """
         # Initialize DINO detector
-        detector = DinoDetectionModel(
-            text_prompt=text_prompt,
-            device=device,
-            box_threshold=box_threshold,
-            text_threshold=text_threshold,
-            dino_cfg_path=dino_cfg_path,
-            dino_ckpt_path=dino_ckpt_path
-        )
+        if grounding_dino_model and DinoDetectionModel is not None:
+            # Use Transformers Grounding DINO if model ID provided
+            from .grounding_dino_transformers import GroundingDinoDetector
+            
+            class TransformersDinoWrapper:
+                """Wrapper to match the old interface"""
+                def __init__(self):
+                    self.detector = GroundingDinoDetector(
+                        model_id=grounding_dino_model,
+                        device=device,
+                        box_threshold=box_threshold,
+                        text_threshold=text_threshold
+                    )
+                    self.text_prompt = text_prompt
+                    
+                def detect(self, image_path):
+                    return self.detector.detect(image_path, self.text_prompt)
+            
+            detector = TransformersDinoWrapper()
+        else:
+            # Use legacy DynamicSAM2 detector
+            detector = DinoDetectionModel(
+                text_prompt=text_prompt,
+                device=device,
+                box_threshold=box_threshold,
+                text_threshold=text_threshold,
+                dino_cfg_path=dino_cfg_path,
+                dino_ckpt_path=dino_ckpt_path
+            )
         
-        # Initialize base class
+        # Initialize base class with all parameters
         super().__init__(
             detector=detector,
+            sam2_model_id=sam2_model_id,
             sam2_cfg_path=sam2_cfg_path,
             sam2_ckpt_path=sam2_ckpt_path,
-            device=device
+            device=device,
+            mask_threshold=mask_threshold,
+            use_stability_score=use_stability_score,
+            stability_score_thresh=stability_score_thresh,
+            remove_small_regions=remove_small_regions,
+            min_region_area=min_region_area,
+            resolve_overlaps=resolve_overlaps,
+            overlap_resolution=overlap_resolution,
+            mask_selection=mask_selection,
+            clip_to_bbox=clip_to_bbox
         )
 
 class SegmentationBased:
