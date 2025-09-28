@@ -25,8 +25,14 @@ def visualize_segmentation_results(image_path, boxes, labels, confidences, masks
     masks (np.ndarray): Array of binary masks with shape [num_objects, height, width]
     """
     # Load the original image
-    image = cv2.imread(image_path)
+    image = cv2.imread(str(image_path))  # Convert to string in case it's a Path object
+    if image is None:
+        print(f"Error: Could not load image from {image_path}")
+        return
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    
+    # Get image dimensions
+    img_height, img_width = image.shape[:2]
     
     # Create display figure
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 10))
@@ -60,6 +66,12 @@ def visualize_segmentation_results(image_path, boxes, labels, confidences, masks
     
     # Add each mask with a unique color
     for i, (mask, color) in enumerate(zip(masks, colors)):
+        # Ensure mask has the same dimensions as the image
+        if mask.shape != (img_height, img_width):
+            # Resize mask if needed
+            mask = cv2.resize(mask.astype(np.uint8), (img_width, img_height), interpolation=cv2.INTER_NEAREST)
+        
+        # Create colored mask overlay
         color_mask = np.zeros_like(image)
         for c in range(3):
             color_mask[:, :, c] = mask * (color[c] * 255)
@@ -695,6 +707,9 @@ class PixelSHAPVisualizer:
                 continue
             
             mask = masks[obj_idx]
+            # Ensure mask is boolean for all operations
+            if mask.dtype != bool:
+                mask = mask.astype(bool)
             all_objects_mask |= mask  # Add to composite mask
             normalized_importance = normalized_values[obj_key]
     

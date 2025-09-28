@@ -90,12 +90,106 @@ if "DYNAMIC_SAM2_PATH" in os.environ:
         print(f"Note: DynamicSAM2 configured but import failed: {e}")
 
 # Try to import Transformers Grounding DINO if available
-if DinoDetectionModel is None:
-    try:
-        from .grounding_dino_transformers import DinoDetectionModel
-        print("Using Transformers Grounding DINO (auto-downloads models)")
-    except ImportError:
-        pass  # Will be None if transformers not available
+try:
+    from transformers import AutoProcessor, AutoModelForZeroShotObjectDetection
+    from PIL import Image as PILImage
+    
+    class TransformersDinoDetector(BaseObjectDetector):
+        """Grounding DINO detector using HuggingFace Transformers"""
+        
+        def __init__(self, 
+                     text_prompt: str,
+                     model_id: str = "IDEA-Research/grounding-dino-tiny",
+                     device: str = "cuda",
+                     box_threshold: float = 0.35,
+                     text_threshold: float = 0.25):
+            self.text_prompt = text_prompt
+            self.model_id = model_id
+            self.device = device if torch.cuda.is_available() else "cpu"
+            self.box_threshold = box_threshold
+            self.text_threshold = text_threshold
+            
+            # Load processor and model
+            self.processor = AutoProcessor.from_pretrained(model_id)
+            self.model = AutoModelForZeroShotObjectDetection.from_pretrained(model_id).to(self.device)
+        
+        def detect(self, image_path: Union[str, Path]) -> Tuple[Optional[np.ndarray], Optional[List[str]], Optional[List[float]]]:
+            """Detect objects based on text prompt"""
+            # Load image as PIL Image
+            image = PILImage.open(str(image_path))
+            
+            # Convert to RGB if necessary
+            if image.mode != "RGB":
+                image = image.convert("RGB")
+            
+            # Convert PIL image to numpy array for the processor
+            image_np = np.array(image)
+            
+            # Parse text labels - ensure they end with period for better detection
+            labels = [label.strip() for label in self.text_prompt.split(",")]
+            # Join labels with periods for better detection
+            text_input = ". ".join(labels)
+            if not text_input.endswith("."):
+                text_input = text_input + "."
+            
+            # Process inputs - text should be a string, not a list
+            inputs = self.processor(
+                images=image_np,  # Use numpy array
+                text=text_input,  # Pass as string
+                return_tensors="pt"
+            ).to(self.device)
+            
+            # Run detection
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+            
+            # Post-process results
+            results = self.processor.post_process_grounded_object_detection(
+                outputs,
+                inputs.input_ids,
+                threshold=self.box_threshold,
+                text_threshold=self.text_threshold,
+                target_sizes=[image.size[::-1]]
+            )
+            
+            if len(results) == 0 or len(results[0]["boxes"]) == 0:
+                return None, None, None
+                
+            result = results[0]
+            boxes = result["boxes"].cpu().numpy()
+            scores = result["scores"].cpu().numpy().tolist()
+            
+            # Get labels - handle different key names and formats
+            if "labels" in result:
+                # Labels might be indices or text
+                raw_labels = result["labels"]
+                if isinstance(raw_labels[0], str):
+                    labels = raw_labels
+                else:
+                    # If they're indices, map them back to our text labels
+                    original_labels = [label.strip() for label in self.text_prompt.split(",")]
+                    labels = []
+                    for idx in raw_labels:
+                        if isinstance(idx, torch.Tensor):
+                            idx = idx.item()
+                        # Map index to label (may repeat if multiple instances)
+                        if idx < len(original_labels):
+                            labels.append(original_labels[idx])
+                        else:
+                            labels.append(f"object_{idx}")
+            else:
+                # Fallback to empty labels
+                labels = [f"object_{i}" for i in range(len(boxes))]
+            
+            # Clean up labels - remove any trailing periods or extra whitespace
+            labels = [label.strip().rstrip(".") for label in labels]
+            
+            return boxes, labels, scores
+    
+    TRANSFORMERS_DINO_AVAILABLE = True
+except ImportError:
+    TransformersDinoDetector = None
+    TRANSFORMERS_DINO_AVAILABLE = False
 
 class BaseSegmentationModel:
     """Base class for object segmentation models"""
@@ -673,12 +767,12 @@ class DinoSam2SegmentationModel(BaseSam2SegmentationModel):
         sam2_model_id: str = "facebook/sam2.1-hiera-large",
         sam2_cfg_path: str = None,  # Deprecated
         sam2_ckpt_path: str = None,  # Deprecated
-        grounding_dino_model: str = None,
+        grounding_dino_model: str = "IDEA-Research/grounding-dino-tiny",
         device: str = "cuda",
         box_threshold: float = 0.35,
         text_threshold: float = 0.25,
-        dino_cfg_path: str = "../grounding_dino/groundingdino/config/GroundingDINO_SwinT_OGC.py",
-        dino_ckpt_path: str = "../gdino_checkpoints/groundingdino_swint_ogc.pth",
+        dino_cfg_path: str = None,  # Deprecated
+        dino_ckpt_path: str = None,  # Deprecated
         mask_threshold: float = 0.5,
         use_stability_score: bool = True,
         stability_score_thresh: float = 0.95,
@@ -693,46 +787,27 @@ class DinoSam2SegmentationModel(BaseSam2SegmentationModel):
         Initialize Grounding DINO+SAM2 segmentation model
         
         Args:
-            text_prompt: Text prompt for object detection
+            text_prompt: Text prompt for object detection (comma-separated)
             sam2_model_id: HuggingFace model ID (e.g., "facebook/sam2.1-hiera-large")
-            sam2_cfg_path: (Deprecated) Legacy parameter, ignored
-            sam2_ckpt_path: (Deprecated) Legacy parameter, ignored
             grounding_dino_model: HuggingFace model ID for Grounding DINO (e.g., "IDEA-Research/grounding-dino-tiny")
             device: Device to run models on
             box_threshold: Confidence threshold for bounding boxes
             text_threshold: Text similarity threshold
-            dino_cfg_path: (Legacy) Path to Grounding DINO config file
-            dino_ckpt_path: (Legacy) Path to Grounding DINO checkpoint file
+            Other args are SAM2 parameters for mask refinement
         """
-        # Initialize DINO detector
-        if grounding_dino_model and DinoDetectionModel is not None:
-            # Use Transformers Grounding DINO if model ID provided
-            from .grounding_dino_transformers import GroundingDinoDetector
-            
-            class TransformersDinoWrapper:
-                """Wrapper to match the old interface"""
-                def __init__(self):
-                    self.detector = GroundingDinoDetector(
-                        model_id=grounding_dino_model,
-                        device=device,
-                        box_threshold=box_threshold,
-                        text_threshold=text_threshold
-                    )
-                    self.text_prompt = text_prompt
-                    
-                def detect(self, image_path):
-                    return self.detector.detect(image_path, self.text_prompt)
-            
-            detector = TransformersDinoWrapper()
-        else:
-            # Use legacy DynamicSAM2 detector
-            detector = DinoDetectionModel(
+        # Initialize DINO detector using Transformers
+        if TRANSFORMERS_DINO_AVAILABLE:
+            detector = TransformersDinoDetector(
                 text_prompt=text_prompt,
+                model_id=grounding_dino_model,
                 device=device,
                 box_threshold=box_threshold,
-                text_threshold=text_threshold,
-                dino_cfg_path=dino_cfg_path,
-                dino_ckpt_path=dino_ckpt_path
+                text_threshold=text_threshold
+            )
+        else:
+            raise ImportError(
+                "Grounding DINO requires transformers library. "
+                "Please install it with: pip install transformers"
             )
         
         # Initialize base class with all parameters
@@ -752,6 +827,110 @@ class DinoSam2SegmentationModel(BaseSam2SegmentationModel):
             mask_selection=mask_selection,
             clip_to_bbox=clip_to_bbox
         )
+
+class GenericInstanceSegmentationModel(BaseSegmentationModel):
+    """
+    Generic wrapper for any instance segmentation model.
+    Simple and flexible - just pass your model and preprocessing/postprocessing functions.
+    
+    Example usage:
+        model = torchvision.models.detection.maskrcnn_resnet50_fpn(pretrained=True)
+        
+        def preprocess(image):
+            # Convert to tensor and normalize
+            return transform(image)
+            
+        def postprocess(outputs, image_shape):
+            # Extract boxes, labels, scores, masks from model output
+            return boxes, labels, scores, masks
+            
+        segmentation_model = GenericInstanceSegmentationModel(
+            model=model,
+            preprocess_fn=preprocess,
+            postprocess_fn=postprocess,
+            device='cuda'
+        )
+    """
+    
+    def __init__(
+        self,
+        model,
+        preprocess_fn,
+        postprocess_fn,
+        device: str = "cuda",
+        score_threshold: float = 0.5
+    ):
+        """
+        Initialize generic instance segmentation wrapper.
+        
+        Args:
+            model: Any pre-trained instance segmentation model
+            preprocess_fn: Function to preprocess image before feeding to model
+            postprocess_fn: Function to extract boxes, labels, scores, masks from model output
+            device: Device to run model on
+            score_threshold: Minimum score to keep predictions
+        """
+        self.model = model
+        self.preprocess_fn = preprocess_fn
+        self.postprocess_fn = postprocess_fn
+        self.device = device
+        self.score_threshold = score_threshold
+        
+        # Move model to device and set to eval mode
+        if hasattr(model, 'to'):
+            self.model = self.model.to(device)
+        if hasattr(model, 'eval'):
+            self.model.eval()
+    
+    def segment(self, image_path: Union[str, Path]) -> Tuple[Optional[np.ndarray], Optional[List[str]], Optional[List[float]], Optional[np.ndarray]]:
+        """
+        Perform instance segmentation on an image.
+        
+        Args:
+            image_path: Path to the image
+            
+        Returns:
+            Tuple of (bounding boxes, class labels, confidence scores, segmentation masks)
+        """
+        # Load image
+        image = cv2.imread(str(image_path))
+        if image is None:
+            raise ValueError(f"Could not load image from {image_path}")
+        
+        # Convert BGR to RGB
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        
+        # Preprocess image
+        preprocessed = self.preprocess_fn(image_rgb)
+        
+        # Run model inference
+        with torch.no_grad():
+            if isinstance(preprocessed, list):
+                # If it's a list of tensors, move each to device
+                preprocessed = [t.to(self.device) if hasattr(t, 'to') else t for t in preprocessed]
+                outputs = self.model(preprocessed)
+            elif isinstance(preprocessed, torch.Tensor):
+                # Move to device if it's a tensor
+                preprocessed = preprocessed.to(self.device)
+                outputs = self.model(preprocessed)
+            else:
+                outputs = self.model(preprocessed)
+        
+        # Postprocess outputs
+        boxes, labels, scores, masks = self.postprocess_fn(outputs, image.shape[:2])
+        
+        # Filter by score threshold
+        if scores is not None and len(scores) > 0:
+            keep_indices = [i for i, score in enumerate(scores) if score >= self.score_threshold]
+            if keep_indices:
+                boxes = boxes[keep_indices] if boxes is not None else None
+                labels = [labels[i] for i in keep_indices] if labels is not None else None
+                scores = [scores[i] for i in keep_indices] if scores is not None else None
+                masks = masks[keep_indices] if masks is not None else None
+            else:
+                return None, None, None, None
+        
+        return boxes, labels, scores, masks
 
 class SegmentationBased:
     """Base class for segmentation-based manipulators"""
